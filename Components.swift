@@ -1,160 +1,104 @@
 import SwiftUI
 
-// MARK: - Liquid Glass Modifier
+// MARK: - Liquid Glass Modifier (Apple-Style Minimal)
 struct LiquidGlass: ViewModifier {
-    var cornerradius: CGFloat = 30
+    var cornerRadius: CGFloat = 20
+    var material: Material = .ultraThinMaterial
     
     func body(content: Content) -> some View {
         content
-            .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: cornerradius, style: .continuous))
-            .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 10)
-            // Specular Highlight (The "Wet" Edge)
+            .background(material)
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+            .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 4)
+            // Subtle border for definition
             .overlay(
-                RoundedRectangle(cornerRadius: cornerradius, style: .continuous)
-                    .stroke(
-                        LinearGradient(
-                            stops: [
-                                .init(color: .white.opacity(0.6), location: 0),
-                                .init(color: .white.opacity(0.1), location: 0.3),
-                                .init(color: .clear, location: 0.5),
-                                .init(color: .white.opacity(0.3), location: 1)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        lineWidth: 1
-                    )
-            )
-            // Subtle inner glow
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerradius, style: .continuous)
-                    .strokeBorder(.white.opacity(0.05), lineWidth: 0.5)
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .strokeBorder(.primary.opacity(0.06), lineWidth: 0.5)
             )
     }
 }
 
 extension View {
-    func liquidGlass(cornerRadius: CGFloat = 30) -> some View {
-        self.modifier(LiquidGlass(cornerradius: cornerRadius))
+    func liquidGlass(cornerRadius: CGFloat = 20, material: Material = .ultraThinMaterial) -> some View {
+        self.modifier(LiquidGlass(cornerRadius: cornerRadius, material: material))
     }
 }
 
-// MARK: - Fluid Background
-struct FluidBackground: View {
-    @State private var animate = false
-    
+// MARK: - Clean Background (Apple-Style)
+struct CleanBackground: View {
     var body: some View {
-        ZStack {
-            Color.saldoBackground.ignoresSafeArea()
-            
-            // Blob 1: Yellow
-            Circle()
-                .fill(Color.saldoYellow.opacity(0.4))
-                .frame(width: 300, height: 300)
-                .blur(radius: 80)
-                .offset(x: animate ? -100 : 100, y: animate ? -100 : 100)
-            
-            // Blob 2: Cyan
-            Circle()
-                .fill(Color.saldoCyan.opacity(0.3))
-                .frame(width: 350, height: 350)
-                .blur(radius: 90)
-                .offset(x: animate ? 150 : -150, y: animate ? 100 : -100)
-            
-            // Blob 3: Purple (Deep)
-            Circle()
-                .fill(Color.saldoPurple.opacity(0.3))
-                .frame(width: 400, height: 400)
-                .blur(radius: 100)
-                .offset(x: animate ? -50 : 50, y: animate ? 200 : -200)
-        }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 7).repeatForever(autoreverses: true)) {
-                animate.toggle()
-            }
-        }
+        Color.saldoBackground
+            .ignoresSafeArea()
     }
 }
 
 // MARK: - Balance Card
 struct BalanceCard: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text("Remaining")
-                    .font(.system(size: 18, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.8))
-                
-                Spacer()
-                
-                Image(systemName: "person.circle")
-                    .font(.title2)
-                    .foregroundStyle(.white.opacity(0.7))
-            }
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Remaining Balance")
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundStyle(Color.saldoSecondary)
             
             Text("₹4,200.00")
-                .font(.system(size: 46, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-                // Use a subtle shadow to lift text off the glass
-                .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 2)
+                .font(.system(size: 48, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.saldoPrimary)
             
-            Text("rupees")
-                .font(.system(size: 20, weight: .medium, design: .rounded))
-                .foregroundStyle(.white.opacity(0.5))
+            HStack(spacing: 4) {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(Color.saldoGreen)
+                Text("On track this month")
+                    .font(.footnote)
+                    .foregroundStyle(Color.saldoSecondary)
+            }
         }
-        .padding(24)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .liquidGlass()
+        .padding(24)
+        .liquidGlass(cornerRadius: 24, material: .regular)
     }
 }
 
-// MARK: - Spending Card (Weekly)
+// MARK: - Weekly Spend Card
 struct WeeklySpendCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Spent this week")
-                .font(.system(size: 14, weight: .medium, design: .rounded))
-                .foregroundStyle(.black.opacity(0.7))
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundStyle(Color.saldoSecondary)
             
             Text("₹1,500")
-                .font(.system(size: 32, weight: .bold, design: .rounded))
-                .foregroundStyle(.black)
+                .font(.system(size: 36, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.saldoPrimary)
             
             HStack(spacing: 4) {
                 Image(systemName: "arrow.up.right")
+                    .font(.caption)
                 Text("12% higher")
+                    .font(.caption)
             }
-            .font(.caption)
-            .fontWeight(.semibold)
-            .foregroundStyle(.black.opacity(0.6))
+            .foregroundStyle(Color.saldoSecondary)
             
             Spacer()
             
-            // Fake Chart
+            // Minimal Chart
             HStack(alignment: .bottom, spacing: 6) {
-                ForEach(0..<5) { i in
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(Color.black.opacity(0.2))
-                        .frame(height: CGFloat([20, 40, 30, 60, 45][i]))
+                ForEach(0..<7) { i in
+                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                        .fill(i == 6 ? Color.saldoAccent : Color.saldoAccent.opacity(0.3))
+                        .frame(height: CGFloat([25, 45, 35, 60, 50, 40, 70][i]))
                 }
             }
+            .frame(height: 70)
         }
-        .padding()
-        .frame(height: 180)
+        .padding(20)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.saldoYellow) // Solid accent color for this specific card
-        .clipShape(RoundedRectangle(cornerRadius: 30, style: .continuous))
-        .shadow(color: Color.saldoYellow.opacity(0.3), radius: 15, x: 0, y: 10)
-        // Add a "Glass" gloss over the solid color
-        .overlay(
-            RoundedRectangle(cornerRadius: 30, style: .continuous)
-                .strokeBorder(LinearGradient(colors: [.white.opacity(0.5), .clear], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 1)
-        )
+        .liquidGlass(cornerRadius: 24, material: .regular)
     }
 }
 
-// MARK: - Action Buttons
+// MARK: - Action Button
 struct ActionButton: View {
     var icon: String
     var title: String
@@ -166,29 +110,30 @@ struct ActionButton: View {
             VStack(spacing: 12) {
                 ZStack {
                     Circle()
-                        .fill(Color.saldoYellow)
-                        .frame(width: 50, height: 50)
+                        .fill(Color.saldoAccent.opacity(0.15))
+                        .frame(width: 56, height: 56)
                     
                     Image(systemName: icon)
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(.black)
+                        .font(.title2)
+                        .foregroundStyle(Color.saldoAccent)
                 }
                 
                 VStack(spacing: 4) {
                     Text(title)
-                        .font(.system(size: 16, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Color.saldoPrimary)
                     
                     Text(subtitle)
                         .font(.caption)
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(Color.saldoSecondary)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding()
-            .liquidGlass(cornerRadius: 30)
+            .liquidGlass(cornerRadius: 20)
         }
+        .buttonStyle(.plain)
     }
 }
 
@@ -199,24 +144,21 @@ struct WideActionButton: View {
     
     var body: some View {
         Button(action: action) {
-            HStack {
+            HStack(spacing: 8) {
                 Image(systemName: icon)
-                    .foregroundStyle(Color.saldoYellow)
+                    .foregroundStyle(Color.saldoAccent)
                 
                 Text(title)
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Color.saldoPrimary)
             }
-            .padding()
+            .padding(.vertical, 14)
+            .padding(.horizontal, 20)
             .frame(maxWidth: .infinity)
-            .background(Color.black.opacity(0.3))
-            .background(.ultraThinMaterial)
-            .clipShape(Capsule())
-            .overlay(
-                Capsule()
-                    .strokeBorder(Color.white.opacity(0.1), lineWidth: 1)
-            )
+            .liquidGlass(cornerRadius: 16)
         }
+        .buttonStyle(.plain)
     }
 }
 
@@ -228,35 +170,38 @@ struct TransactionRow: View {
     var amount: String = "₹0.00"
     
     var body: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 14) {
             ZStack {
                 Circle()
-                    .fill(Color.white.opacity(0.1))
-                    .frame(width: 48, height: 48)
+                    .fill(Color.saldoCardBackground)
+                    .frame(width: 44, height: 44)
                 
                 Image(systemName: icon)
-                    .font(.system(size: 20))
-                    .foregroundStyle(.white)
+                    .font(.body)
+                    .foregroundStyle(Color.saldoAccent)
             }
             
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 17, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white)
+                    .font(.body)
+                    .fontWeight(.medium)
+                    .foregroundStyle(Color.saldoPrimary)
                 
                 Text(subtitle)
                     .font(.caption)
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(Color.saldoSecondary)
             }
             
             Spacer()
             
             Text(amount)
-                .font(.system(size: 17, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white)
+                .font(.body)
+                .fontWeight(.semibold)
+                .foregroundStyle(Color.saldoPrimary)
         }
-        .padding()
-        .background(Color.white.opacity(0.03))
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .padding(.vertical, 12)
+        .padding(.horizontal, 16)
+        .background(Color.saldoCardBackground.opacity(0.5))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }

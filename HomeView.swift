@@ -3,78 +3,83 @@ import SwiftUI
 struct HomeView: View {
     var body: some View {
         ZStack {
-            // Layer 1: The Liquid Fluid Background
-            FluidBackground()
+            // Clean Apple-style background
+            CleanBackground()
             
-            // Layer 2: Content
+            // Content
             ScrollView {
-                VStack(spacing: 24) {
+                VStack(spacing: 20) {
                     // Header Area
                     HStack {
-                        Image(systemName: "person.crop.circle")
-                            .font(.largeTitle)
-                            .foregroundStyle(.white)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Good Evening")
+                                .font(.subheadline)
+                                .foregroundStyle(Color.saldoSecondary)
+                            Text("Aryaman")
+                                .font(.title)
+                                .fontWeight(.bold)
+                                .foregroundStyle(Color.saldoPrimary)
+                        }
                         
                         Spacer()
                         
-                        Image(systemName: "gearshape.fill")
-                            .font(.title2)
-                            .foregroundStyle(.white)
+                        Button(action: {}) {
+                            Image(systemName: "person.crop.circle")
+                                .font(.title2)
+                                .foregroundStyle(Color.saldoAccent)
+                        }
                     }
-                    .padding(.horizontal)
-                    .padding(.top)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
                     
                     // Main Balance
                     BalanceCard()
-                        .padding(.horizontal)
+                        .padding(.horizontal, 20)
                     
                     // Grid Section
-                    HStack(alignment: .top, spacing: 16) {
-                        // Left Column: Weekly Spend (Tall/Large)
+                    HStack(alignment: .top, spacing: 12) {
+                        // Left Column: Weekly Spend
                         WeeklySpendCard()
-                            .frame(minHeight: 180)
                         
                         // Right Column: Actions
-                        VStack(spacing: 16) {
+                        VStack(spacing: 12) {
                             ActionButton(
-                                icon: "plus",
-                                title: "Subscription",
-                                subtitle: "Tap to add",
+                                icon: "plus.circle.fill",
+                                title: "Add",
+                                subtitle: "Subscription",
                                 action: {}
                             )
-                            .frame(height: 180) // Match height of Spend Card roughly? Or let it be flexible.
                             
                             WideActionButton(
-                                icon: "sparkles",
-                                title: "Get Insights",
+                                icon: "chart.bar.fill",
+                                title: "Insights",
                                 action: {}
                             )
                         }
                         .frame(maxWidth: .infinity)
                     }
-                    .padding(.horizontal)
+                    .padding(.horizontal, 20)
                     
                     // Transactions Section
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text("Transactions")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundStyle(.white)
-                            .padding(.horizontal)
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Recent Transactions")
+                            .font(.title3)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Color.saldoPrimary)
+                            .padding(.horizontal, 20)
                         
-                        VStack(spacing: 12) {
+                        VStack(spacing: 8) {
                             TransactionRow(icon: "basket.fill", title: "Grocery", subtitle: "5:30 PM", amount: "₹450.00")
                             TransactionRow(icon: "music.note", title: "Spotify", subtitle: "Yesterday", amount: "₹119.00")
                             TransactionRow(icon: "cup.and.saucer.fill", title: "Starbucks", subtitle: "Yesterday", amount: "₹350.00")
                             TransactionRow(icon: "gamecontroller.fill", title: "Steam", subtitle: "2 days ago", amount: "₹899.00")
                         }
-                        .padding(.horizontal)
+                        .padding(.horizontal, 20)
                     }
-                    .padding(.bottom, 40)
+                    .padding(.bottom, 30)
                 }
             }
         }
-        .preferredColorScheme(.dark)
     }
 }
 
