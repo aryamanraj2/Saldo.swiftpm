@@ -65,8 +65,8 @@ struct HomeView: View {
                             )
                             
                             WideActionButton(
-                                icon: "chart.bar.fill",
-                                title: "Insights",
+                                icon: "sparkles",
+                                title: "Get Insights",
                                 colors: colors,
                                 action: {}
                             )

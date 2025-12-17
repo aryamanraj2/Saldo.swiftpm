@@ -276,34 +276,20 @@ struct WideActionButton: View {
     
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(colors.accent)
-                        .frame(width: 36, height: 36)
-                    
-                    Image(systemName: icon) 
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(colors.secondary) // Contrast text on accent
-                }
+            HStack(spacing: 8) {
+                Image(systemName: icon) 
+                    .font(.headline)
+                    .fontWeight(.bold)
                 
                 Text(title)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(Color.saldoPrimary)
-                    .lineLimit(1)
-                
-                Spacer()
-                
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundStyle(Color.saldoSecondary.opacity(0.5))
+                    .font(.headline)
+                    .fontWeight(.bold)
             }
-            .padding(.vertical, 12)
-            .padding(.horizontal, 16)
+            .foregroundStyle(colors.primary)
+            .padding(.vertical, 16)
+            .padding(.horizontal, 20)
             .frame(maxWidth: .infinity)
-            .liquidGlass(cornerRadius: 20, shadowColor: colors.accent)
+            .liquidGlass(cornerRadius: 100, shadowColor: colors.accent)
         }
         .buttonStyle(.plain)
     }
