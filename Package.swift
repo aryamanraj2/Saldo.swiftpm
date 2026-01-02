@@ -32,6 +32,10 @@ let package = Package(
                 .landscapeLeft,
                 .portraitUpsideDown(.when(deviceFamilies: [.pad]))
             ],
+            capabilities: [
+                .fileAccess(.pictureFolder, mode: .readWrite),
+                .camera(purposeString: "scan reciepts")
+            ],
             appCategory: .finance
         )
     ],
