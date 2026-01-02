@@ -45,7 +45,7 @@ struct ScannerSheetContainer: View {
                 .modifier(
                     PresentationEnhancements(
                         enableBackgroundInteractionUpThrough: .medium,
-                        cornerRadius: 24
+                        cornerRadius: 32
                     )
                 )
             }
@@ -85,26 +85,16 @@ struct ScannerSheetContent: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            if selectedDetent == .height(smallHeight) {
-                // MARK: - Small Detent (Pill)
-                SmallDetentPill(colors: colors) {
-                    withAnimation(.interactiveSpring(response: 0.4, dampingFraction: 0.8)) {
-                        selectedDetent = .medium
-                    }
-                }
-                .transition(.opacity.combined(with: .scale(scale: 0.95)))
-            } else {
-                // MARK: - Medium Detent Content
-                MediumDetentContent(
-                    colors: colors,
-                    onScanTap: onScanTap,
-                    onCollapse: {
-                        withAnimation(.interactiveSpring(response: 0.35, dampingFraction: 0.8)) {
-                            selectedDetent = .height(smallHeight)
-                        }
-                    }
-                )
-                .transition(.opacity.combined(with: .move(edge: .bottom)))
+            // MARK: - Floating Search Bar (Always Visible - Like Apple Maps)
+            FloatingScanBar(colors: colors, onScanTap: onScanTap)
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, selectedDetent == .height(smallHeight) ? 12 : 16)
+            
+            // MARK: - Expanded Content (Only in Medium Detent)
+            if selectedDetent != .height(smallHeight) {
+                ExpandedSheetContent(colors: colors)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -112,153 +102,70 @@ struct ScannerSheetContent: View {
     }
 }
 
-// MARK: - Small Detent Pill (replaces MinimizedSheetPill)
-struct SmallDetentPill: View {
-    var colors: ThemeColors
-    var onTap: () -> Void
-    
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 12) {
-                // Camera icon with accent background
-                ZStack {
-                    Circle()
-                        .fill(colors.accent.opacity(0.15))
-                        .frame(width: 36, height: 36)
-                    
-                    Image(systemName: "camera.fill")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(colors.accent)
-                }
-                
-                Text("Scan Receipt")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(Color.saldoPrimary)
-                
-                Spacer()
-                
-                // Chevron indicator
-                Image(systemName: "chevron.up")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(Color.saldoSecondary.opacity(0.7))
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-        }
-        .buttonStyle(FloatingSheetButtonStyle())
-    }
-}
-
-// MARK: - Glass Background (iOS 26 Liquid Glass)
-struct GlassBackground: View {
-    var cornerRadius: CGFloat
-    
-    var body: some View {
-        // Use glassEffect for iOS 26+, fallback to ultraThinMaterial
-        if #available(iOS 26.0, *) {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .strokeBorder(.white.opacity(0.3), lineWidth: 0.5)
-                )
-                .glassEffect(in: .rect(cornerRadius: cornerRadius))
-        } else {
-            // Fallback on earlier versions
-        }
-    }
-}
-
-// MARK: - Minimized Sheet Pill
-struct MinimizedSheetPill: View {
-    var colors: ThemeColors
-    var onTap: () -> Void
-    
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: 12) {
-                // Camera icon with accent background
-                ZStack {
-                    Circle()
-                        .fill(colors.accent.opacity(0.15))
-                        .frame(width: 36, height: 36)
-                    
-                    Image(systemName: "camera.fill")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(colors.accent)
-                }
-                
-                Text("Scan Receipt")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(Color.saldoPrimary)
-                
-                Spacer()
-                
-                // Chevron indicator
-                Image(systemName: "chevron.up")
-                    .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(Color.saldoSecondary.opacity(0.7))
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-        }
-        .buttonStyle(FloatingSheetButtonStyle())
-    }
-}
-
-// MARK: - Medium Detent Content
-struct MediumDetentContent: View {
+// MARK: - Floating Scan Bar (Apple Maps Style Pill)
+struct FloatingScanBar: View {
     var colors: ThemeColors
     var onScanTap: () -> Void
-    var onCollapse: () -> Void
+    
+    var body: some View {
+        Button(action: onScanTap) {
+            HStack(spacing: 12) {
+                // Camera icon with accent background
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(colors.accent.opacity(0.12))
+                        .frame(width: 36, height: 36)
+                    
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(colors.accent)
+                }
+                
+                Text("Scan Receipt")
+                    .font(.body)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Color.saldoPrimary)
+                
+                Spacer()
+                
+                // Mic-style icon (matching Apple Maps)
+                Image(systemName: "doc.text.viewfinder")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(Color.saldoSecondary.opacity(0.6))
+                
+                // Profile circle (matching Apple Maps)
+                Circle()
+                    .fill(colors.accent.opacity(0.15))
+                    .frame(width: 32, height: 32)
+                    .overlay(
+                        Image(systemName: "person.fill")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(colors.accent)
+                    )
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .frame(height: 56)
+            .background(
+                Capsule()
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        Capsule()
+                            .strokeBorder(.white.opacity(0.3), lineWidth: 0.5)
+                    )
+                    .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
+            )
+        }
+        .buttonStyle(FloatingSheetButtonStyle())
+    }
+}
+
+// MARK: - Expanded Sheet Content (Below the Search Bar)
+struct ExpandedSheetContent: View {
+    var colors: ThemeColors
     
     var body: some View {
         VStack(spacing: 0) {
-            // Drag Handle
-            DragHandle()
-                .padding(.top, 8)
-                .padding(.bottom, 16)
-            
-            // Scan Receipt Row
-            Button(action: onScanTap) {
-                HStack(spacing: 14) {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(colors.accent.opacity(0.12))
-                            .frame(width: 44, height: 44)
-                        
-                        Image(systemName: "camera.fill")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(colors.accent)
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Scan Receipt")
-                            .font(.body)
-                            .fontWeight(.semibold)
-                            .foregroundStyle(Color.saldoPrimary)
-                        
-                        Text("Take a photo or choose from gallery")
-                            .font(.caption)
-                            .foregroundStyle(Color.saldoSecondary)
-                    }
-                    
-                    Spacer()
-                    
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(Color.saldoSecondary.opacity(0.5))
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .background(Color.saldoSecondary.opacity(0.05))
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            }
-            .buttonStyle(FloatingSheetButtonStyle())
-            .padding(.horizontal, 16)
-            
             // Grills Section Header
             HStack {
                 Text("Grills")
@@ -268,7 +175,7 @@ struct MediumDetentContent: View {
                 
                 Spacer()
                 
-                // TODO badge
+                // Coming Soon badge
                 Text("Coming Soon")
                     .font(.caption2)
                     .fontWeight(.medium)
@@ -279,7 +186,7 @@ struct MediumDetentContent: View {
                     .clipShape(Capsule())
             }
             .padding(.horizontal, 20)
-            .padding(.top, 24)
+            .padding(.top, 8)
             .padding(.bottom, 12)
             
             // Grills Placeholder Grid
@@ -288,15 +195,6 @@ struct MediumDetentContent: View {
             
             Spacer()
         }
-    }
-}
-
-// MARK: - Drag Handle
-struct DragHandle: View {
-    var body: some View {
-        RoundedRectangle(cornerRadius: 3, style: .continuous)
-            .fill(Color.saldoSecondary.opacity(0.35))
-            .frame(width: 36, height: 5)
     }
 }
 
