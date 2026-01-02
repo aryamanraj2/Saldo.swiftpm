@@ -2,7 +2,6 @@ import SwiftUI
 
 struct HomeView: View {
     @State private var balance: Double = 4500.0
-    @State private var scannerSheetState: ScannerSheetState = .minimized
     
     // Computed theme based on balance
     var theme: AppTheme {
@@ -109,15 +108,15 @@ struct HomeView: View {
                         .background(.ultraThinMaterial)
                         .clipShape(RoundedRectangle(cornerRadius: 15))
                         .padding(.horizontal, 20)
-                        .padding(.bottom, scannerSheetState == .minimized ? 80 : 200) // Dynamic padding for sheet
+                        .padding(.bottom, 100) // Fixed padding for native sheet
                     }
                 }
             }
             // Smooth transition for all theme changes
             .animation(.easeInOut(duration: 0.5), value: theme)
             
-            // Receipt Scanner Overlay
-            ReceiptScannerView(sheetState: $scannerSheetState, colors: colors)
+            // Receipt Scanner Sheet (Apple Maps-style)
+            ScannerSheetContainer(colors: colors)
         }
     }
 }

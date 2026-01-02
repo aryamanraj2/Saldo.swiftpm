@@ -1,5 +1,14 @@
 import SwiftUI
 
+// MARK: - Sheet Height Preference Key (Apple Maps-style)
+// Allows child views (the sheet) to report their size to the parent.
+struct SheetHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
 // MARK: - Liquid Glass Modifier (Refined)
 struct LiquidGlass: ViewModifier {
     var cornerRadius: CGFloat = 20

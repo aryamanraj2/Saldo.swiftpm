@@ -1,131 +1,152 @@
 import SwiftUI
 import AVFoundation
 
-// MARK: - Scanner Sheet State
+// MARK: - Scanner Sheet State (simplified for native sheet)
 enum ScannerSheetState: Equatable {
-    case minimized   // Small pill: camera icon + "Scan Receipt"
-    case medium      // Medium detent: scan receipt + grills section
+    case small    // Small detent: ~80pt pill
+    case medium   // Medium detent: expanded content
 }
 
-// MARK: - iOS 26 Floating Sheet View
-struct ReceiptScannerView: View {
-    @Binding var sheetState: ScannerSheetState
+// MARK: - Scanner Sheet Container (Apple Maps-style)
+// This is the main container that manages the native sheet
+struct ScannerSheetContainer: View {
     var colors: ThemeColors
     
-    @State private var dragOffset: CGFloat = 0
+    @State private var showSheet: Bool = true
+    @State private var selectedDetent: PresentationDetent = .height(80)
+    @State private var sheetHeight: CGFloat = 0
     @State private var showCamera = false
-    @GestureState private var isDragging = false
     
-    // Sheet heights
-    private let minimizedHeight: CGFloat = 56
-    private let mediumDetentFraction: CGFloat = 0.42
+    // Configuration
+    private let smallHeight: CGFloat = 80
     
     var body: some View {
-        GeometryReader { geometry in
-            let mediumHeight = geometry.size.height * mediumDetentFraction
-            let currentHeight = sheetState == .minimized ? minimizedHeight : mediumHeight
-            let rawHeight = currentHeight + (dragOffset.isFinite ? dragOffset : 0)
-            let safeHeight = max(minimizedHeight, min(rawHeight, mediumHeight))
-            
-            VStack(spacing: 0) {
+        Color.clear
+            .sheet(isPresented: $showSheet) {
+                ScannerSheetContent(
+                    colors: colors,
+                    selectedDetent: $selectedDetent,
+                    onScanTap: { showCamera = true }
+                )
+                // Read the Sheet's Geometry
+                .overlay {
+                    GeometryReader { proxy in
+                        Color.clear
+                            .preference(key: SheetHeightKey.self, value: proxy.size.height)
+                    }
+                }
+                // Update State when size changes
+                .onPreferenceChange(SheetHeightKey.self) { height in
+                    self.sheetHeight = height
+                }
+                // Sheet Configuration - 2 detents only
+                .presentationDetents([.height(smallHeight), .medium], selection: $selectedDetent)
+                .interactiveDismissDisabled() // Prevents closing the sheet fully
+                .modifier(
+                    PresentationEnhancements(
+                        enableBackgroundInteractionUpThrough: .medium,
+                        cornerRadius: 24
+                    )
+                )
+            }
+            .fullScreenCover(isPresented: $showCamera) {
+                ExpandedCameraView(
+                    colors: colors,
+                    showContent: .constant(true),
+                    onClose: { showCamera = false }
+                )
+            }
+    }
+}
+
+// Applies iOS 16.4+ sheet presentation enhancements when available
+private struct PresentationEnhancements: ViewModifier {
+    let enableBackgroundInteractionUpThrough: PresentationDetent
+    let cornerRadius: CGFloat
+
+    func body(content: Content) -> some View {
+        if #available(iOS 16.4, *) {
+            content
+                .presentationBackgroundInteraction(.enabled(upThrough: enableBackgroundInteractionUpThrough))
+                .presentationCornerRadius(cornerRadius)
+        } else {
+            content
+        }
+    }
+}
+
+// MARK: - Scanner Sheet Content
+struct ScannerSheetContent: View {
+    var colors: ThemeColors
+    @Binding var selectedDetent: PresentationDetent
+    var onScanTap: () -> Void
+    
+    private let smallHeight: CGFloat = 80
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            if selectedDetent == .height(smallHeight) {
+                // MARK: - Small Detent (Pill)
+                SmallDetentPill(colors: colors) {
+                    withAnimation(.interactiveSpring(response: 0.4, dampingFraction: 0.8)) {
+                        selectedDetent = .medium
+                    }
+                }
+                .transition(.opacity.combined(with: .scale(scale: 0.95)))
+            } else {
+                // MARK: - Medium Detent Content
+                MediumDetentContent(
+                    colors: colors,
+                    onScanTap: onScanTap,
+                    onCollapse: {
+                        withAnimation(.interactiveSpring(response: 0.35, dampingFraction: 0.8)) {
+                            selectedDetent = .height(smallHeight)
+                        }
+                    }
+                )
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .animation(.interactiveSpring(response: 0.4, dampingFraction: 0.8), value: selectedDetent)
+    }
+}
+
+// MARK: - Small Detent Pill (replaces MinimizedSheetPill)
+struct SmallDetentPill: View {
+    var colors: ThemeColors
+    var onTap: () -> Void
+    
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: 12) {
+                // Camera icon with accent background
+                ZStack {
+                    Circle()
+                        .fill(colors.accent.opacity(0.15))
+                        .frame(width: 36, height: 36)
+                    
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(colors.accent)
+                }
+                
+                Text("Scan Receipt")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Color.saldoPrimary)
+                
                 Spacer()
                 
-                // Floating Sheet Container
-                VStack(spacing: 0) {
-                    if sheetState == .minimized {
-                        // MARK: - Minimized Pill
-                        MinimizedSheetPill(colors: colors) {
-                            expandToMedium()
-                        }
-                        .transition(.opacity.combined(with: .scale(scale: 0.95)))
-                    } else {
-                        // MARK: - Medium Detent Content
-                        MediumDetentContent(
-                            colors: colors,
-                            onScanTap: { showCamera = true },
-                            onCollapse: { collapseToMinimized() }
-                        )
-                        .transition(.opacity.combined(with: .move(edge: .bottom)))
-                    }
-                }
-                .frame(height: safeHeight)
-                .frame(maxWidth: .infinity)
-                .background(
-                    // iOS 26 Liquid Glass Effect
-                    GlassBackground(cornerRadius: sheetState == .minimized ? 28 : 24)
-                )
-                .clipShape(RoundedRectangle(cornerRadius: sheetState == .minimized ? 28 : 24, style: .continuous))
-                .shadow(color: Color.black.opacity(0.08), radius: 20, x: 0, y: -5)
-                .shadow(color: colors.accent.opacity(0.1), radius: 30, x: 0, y: -10)
-                .padding(.horizontal, sheetState == .minimized ? 20 : 12)
-                .padding(.bottom, sheetState == .minimized ? 16 : 8)
-                .gesture(dragGesture(mediumHeight: mediumHeight))
-                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: sheetState)
-                .animation(.spring(response: 0.3, dampingFraction: 0.85), value: dragOffset)
+                // Chevron indicator
+                Image(systemName: "chevron.up")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Color.saldoSecondary.opacity(0.7))
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
         }
-        .fullScreenCover(isPresented: $showCamera) {
-            ExpandedCameraView(
-                colors: colors,
-                showContent: .constant(true),
-                onClose: { showCamera = false }
-            )
-        }
-    }
-    
-    // MARK: - Drag Gesture
-    private func dragGesture(mediumHeight: CGFloat) -> some Gesture {
-        DragGesture()
-            .updating($isDragging) { _, state, _ in
-                state = true
-            }
-            .onChanged { value in
-                let translation = value.translation.height
-                
-                if sheetState == .minimized {
-                    // Dragging up from minimized
-                    if translation < 0 {
-                        dragOffset = max(translation, -(mediumHeight - minimizedHeight))
-                    }
-                } else {
-                    // Dragging down from medium
-                    if translation > 0 {
-                        dragOffset = min(translation, mediumHeight - minimizedHeight)
-                    }
-                }
-            }
-            .onEnded { value in
-                let velocity = value.velocity.height
-                let translation = value.translation.height
-                
-                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                    dragOffset = 0
-                    
-                    if sheetState == .minimized {
-                        // Threshold to expand: dragged up enough or fast enough
-                        if translation < -50 || velocity < -500 {
-                            sheetState = .medium
-                        }
-                    } else {
-                        // Threshold to collapse: dragged down enough or fast enough
-                        if translation > 50 || velocity > 500 {
-                            sheetState = .minimized
-                        }
-                    }
-                }
-            }
-    }
-    
-    private func expandToMedium() {
-        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-            sheetState = .medium
-        }
-    }
-    
-    private func collapseToMinimized() {
-        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-            sheetState = .minimized
-        }
+        .buttonStyle(FloatingSheetButtonStyle())
     }
 }
 
@@ -574,8 +595,7 @@ class CameraPreviewUIView: UIView {
     ZStack {
         Color.gray.opacity(0.3).ignoresSafeArea()
         
-        ReceiptScannerView(
-            sheetState: .constant(.minimized),
+        ScannerSheetContainer(
             colors: AppTheme.wealthy.colors
         )
     }
