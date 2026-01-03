@@ -115,6 +115,45 @@ struct BalanceCard: View {
     }
 }
 
+// MARK: - Spend Data Point (Backend-Ready Model)
+struct SpendDataPoint: Identifiable {
+    let id = UUID()
+    let timestamp: Date
+    let amount: Double
+    
+    // Factory method for creating sample data (will be replaced by backend)
+    static func sampleData(for period: SpendPeriod) -> [SpendDataPoint] {
+        let calendar = Calendar.current
+        let now = Date()
+        
+        switch period {
+        case .day:
+            // 24 hourly data points
+            return (0..<24).map { hour in
+                let date = calendar.date(byAdding: .hour, value: -23 + hour, to: now) ?? now
+                let amounts: [Double] = [15, 45, 25, 60, 40, 30, 70, 55, 45, 35, 80, 50, 40, 55, 65, 85, 50, 75, 45, 60, 70, 65, 90, 70]
+                return SpendDataPoint(timestamp: date, amount: amounts[hour])
+            }
+        case .week:
+            // 7 daily data points
+            return (0..<7).map { day in
+                let date = calendar.date(byAdding: .day, value: -6 + day, to: now) ?? now
+                let amounts: [Double] = [250, 450, 320, 580, 420, 380, 520]
+                return SpendDataPoint(timestamp: date, amount: amounts[day])
+            }
+        case .month:
+            // 30 daily data points for more curves
+            return (0..<30).map { day in
+                let date = calendar.date(byAdding: .day, value: -29 + day, to: now) ?? now
+                let amounts: [Double] = [180, 220, 160, 280, 350, 200, 240, 180, 320, 260, 
+                                          190, 280, 340, 220, 260, 190, 300, 250, 210, 280,
+                                          320, 240, 200, 260, 290, 220, 250, 200, 270, 300]
+                return SpendDataPoint(timestamp: date, amount: amounts[day])
+            }
+        }
+    }
+}
+
 // MARK: - Spend Period Enum
 enum SpendPeriod: String, CaseIterable {
     case day = "D"
@@ -152,12 +191,140 @@ enum SpendPeriod: String, CaseIterable {
         }
     }
     
-    var chartData: [CGFloat] {
-        switch self {
-        case .day: return [25, 45, 35, 60, 50, 40, 70, 55, 65, 45, 80, 60, 50, 40, 70, 85, 60, 75, 55, 65, 70, 80, 90, 70]
-        case .week: return [25, 45, 35, 60, 50, 40, 70]
-        case .month: return [60, 55, 70, 65]
+    var dataPoints: [SpendDataPoint] {
+        SpendDataPoint.sampleData(for: self)
+    }
+}
+
+// MARK: - Spend Line Graph
+struct SpendLineGraph: View {
+    var dataPoints: [SpendDataPoint]
+    var accentColor: Color
+    var lineColor: Color
+    var animationProgress: CGFloat
+    
+    var body: some View {
+        GeometryReader { geometry in
+            let width = geometry.size.width
+            let height = geometry.size.height
+            let points = normalizedPoints(in: CGSize(width: width, height: height))
+            
+            ZStack {
+                // Smooth curved line
+                SpendLinePath(points: points, progress: animationProgress)
+                    .stroke(lineColor, style: StrokeStyle(lineWidth: 3.7, lineCap: .round, lineJoin: .round))
+            }
         }
+    }
+    
+    // Normalize data points to fit within the view bounds
+    private func normalizedPoints(in size: CGSize) -> [CGPoint] {
+        guard !dataPoints.isEmpty else { return [] }
+        
+        let amounts = dataPoints.map { $0.amount }
+        let minAmount = amounts.min() ?? 0
+        let maxAmount = amounts.max() ?? 1
+        let range = maxAmount - minAmount
+        let safeRange = range > 0 ? range : 1
+        
+        // Horizontal padding 0 to stretch to edges, vertical padding 10 to avoid clipping
+        let horizontalPadding: CGFloat = -12
+        let verticalPadding: CGFloat = 8
+        
+        let usableWidth = size.width - (horizontalPadding * 2)
+        let usableHeight = size.height - (verticalPadding * 2)
+        
+        return dataPoints.enumerated().map { index, point in
+            let x = horizontalPadding + (CGFloat(index) / CGFloat(max(dataPoints.count - 1, 1))) * usableWidth
+            let normalizedY = (point.amount - minAmount) / safeRange
+            let y = verticalPadding + (1 - normalizedY) * usableHeight // Invert Y axis
+            return CGPoint(x: x, y: y)
+        }
+    }
+    
+    // Get position on the curved line at a given percentage
+    private func positionOnCurve(at percentage: CGFloat, points: [CGPoint]) -> CGPoint? {
+        guard points.count >= 2 else { return points.first }
+        
+        let totalSegments = points.count - 1
+        let targetSegment = percentage * CGFloat(totalSegments)
+        let segmentIndex = min(Int(targetSegment), totalSegments - 1)
+        let segmentProgress = targetSegment - CGFloat(segmentIndex)
+        
+        // Get the 4 control points for Catmull-Rom
+        let p0 = points[max(segmentIndex - 1, 0)]
+        let p1 = points[segmentIndex]
+        let p2 = points[min(segmentIndex + 1, points.count - 1)]
+        let p3 = points[min(segmentIndex + 2, points.count - 1)]
+        
+        return catmullRomPoint(p0: p0, p1: p1, p2: p2, p3: p3, t: segmentProgress)
+    }
+    
+    // Catmull-Rom spline interpolation
+    private func catmullRomPoint(p0: CGPoint, p1: CGPoint, p2: CGPoint, p3: CGPoint, t: CGFloat) -> CGPoint {
+        let t2 = t * t
+        let t3 = t2 * t
+        
+        let x = 0.5 * ((2 * p1.x) + (-p0.x + p2.x) * t +
+                (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 +
+                (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3)
+        
+        let y = 0.5 * ((2 * p1.y) + (-p0.y + p2.y) * t +
+                (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 +
+                (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3)
+        
+        return CGPoint(x: x, y: y)
+    }
+}
+
+// MARK: - Animatable Line Path Shape
+struct SpendLinePath: Shape {
+    var points: [CGPoint]
+    var progress: CGFloat
+    
+    var animatableData: CGFloat {
+        get { progress }
+        set { progress = newValue }
+    }
+    
+    func path(in rect: CGRect) -> Path {
+        guard points.count >= 2 else { return Path() }
+        
+        var path = Path()
+        path.move(to: points[0])
+        
+        // Draw smooth curves using Catmull-Rom spline
+        for i in 0..<(points.count - 1) {
+            let p0 = points[max(i - 1, 0)]
+            let p1 = points[i]
+            let p2 = points[min(i + 1, points.count - 1)]
+            let p3 = points[min(i + 2, points.count - 1)]
+            
+            // Generate curve points between p1 and p2
+            let segments = 10
+            for j in 1...segments {
+                let t = CGFloat(j) / CGFloat(segments)
+                let point = catmullRomPoint(p0: p0, p1: p1, p2: p2, p3: p3, t: t)
+                path.addLine(to: point)
+            }
+        }
+        
+        return path.trimmedPath(from: 0, to: progress)
+    }
+    
+    private func catmullRomPoint(p0: CGPoint, p1: CGPoint, p2: CGPoint, p3: CGPoint, t: CGFloat) -> CGPoint {
+        let t2 = t * t
+        let t3 = t2 * t
+        
+        let x = 0.5 * ((2 * p1.x) + (-p0.x + p2.x) * t +
+                (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 +
+                (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3)
+        
+        let y = 0.5 * ((2 * p1.y) + (-p0.y + p2.y) * t +
+                (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 +
+                (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3)
+        
+        return CGPoint(x: x, y: y)
     }
 }
 
@@ -165,6 +332,7 @@ enum SpendPeriod: String, CaseIterable {
 struct WeeklySpendCard: View {
     var colors: ThemeColors
     @State private var selectedPeriod: SpendPeriod = .week
+    @State private var animationProgress: CGFloat = 1.0
     @Namespace private var animation
     
     var body: some View {
@@ -173,8 +341,13 @@ struct WeeklySpendCard: View {
             HStack(spacing: 0) {
                 ForEach(SpendPeriod.allCases, id: \.self) { period in
                     Button(action: {
+                        // Reset and animate the line drawing
+                        animationProgress = 0
                         withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
                             selectedPeriod = period
+                        }
+                        withAnimation(.easeOut(duration: 0.6).delay(0.1)) {
+                            animationProgress = 1.0
                         }
                     }) {
                         ZStack {
@@ -234,15 +407,14 @@ struct WeeklySpendCard: View {
             
             Spacer()
             
-            // Minimal Chart
-            HStack(alignment: .bottom, spacing: selectedPeriod == .day ? 2 : 6) {
-                ForEach(Array(selectedPeriod.chartData.enumerated()), id: \.offset) { index, height in
-                    RoundedRectangle(cornerRadius: 4, style: .continuous)
-                        .fill(index == selectedPeriod.chartData.count - 1 ? colors.accent : colors.primary.opacity(0.15))
-                        .frame(height: height)
-                }
-            }
-            .frame(height: 60)
+            // Smooth Curved Line Graph
+            SpendLineGraph(
+                dataPoints: selectedPeriod.dataPoints,
+                accentColor: colors.accent,
+                lineColor: colors.primary,
+                animationProgress: animationProgress
+            )
+            .frame(height: 70)
             .animation(.spring(response: 0.4, dampingFraction: 0.8), value: selectedPeriod)
         }
         .padding(20)
