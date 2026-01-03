@@ -61,7 +61,7 @@ struct HomeView: View {
                                 )
                                 
                                 WideActionButton(
-                                    icon: "sparkles",
+                                    icon: "apple.intelligence",
                                     title: "Get Insights",
                                     colors: colors,
                                     action: {}
