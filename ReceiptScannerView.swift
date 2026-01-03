@@ -128,20 +128,10 @@ struct FloatingScanBar: View {
                 
                 Spacer()
                 
-                // Mic-style icon (matching Apple Maps)
+                // Document viewfinder icon
                 Image(systemName: "doc.text.viewfinder")
                     .font(.system(size: 16, weight: .medium))
                     .foregroundStyle(Color.saldoSecondary.opacity(0.6))
-                
-                // Profile circle (matching Apple Maps)
-                Circle()
-                    .fill(colors.accent.opacity(0.15))
-                    .frame(width: 32, height: 32)
-                    .overlay(
-                        Image(systemName: "person.fill")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(colors.accent)
-                    )
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
