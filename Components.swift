@@ -165,38 +165,52 @@ enum SpendPeriod: String, CaseIterable {
 struct WeeklySpendCard: View {
     var colors: ThemeColors
     @State private var selectedPeriod: SpendPeriod = .week
+    @Namespace private var animation
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Period Toggle
-            HStack {
-                Spacer()
-                HStack(spacing: 4) {
-                    ForEach(SpendPeriod.allCases, id: \.self) { period in
-                        Button(action: {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                selectedPeriod = period
-                            }
-                        }) {
-                            Text(period.rawValue)
-                                .font(.caption)
-                                .fontWeight(selectedPeriod == period ? .semibold : .medium)
-                                .foregroundStyle(selectedPeriod == period ? colors.accent : Color.saldoSecondary)
-                                .frame(width: 28, height: 28)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                        .fill(selectedPeriod == period ? Color.saldoSecondary.opacity(0.15) : Color.clear)
-                                )
+            // Liquid Glass Switcher
+            HStack(spacing: 0) {
+                ForEach(SpendPeriod.allCases, id: \.self) { period in
+                    Button(action: {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                            selectedPeriod = period
                         }
-                        .buttonStyle(.plain)
+                    }) {
+                        ZStack {
+                            if selectedPeriod == period {
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .fill(.ultraThinMaterial)
+                                    .shadow(color: Color.black.opacity(0.12), radius: 4, x: 0, y: 2)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                            .stroke(.white.opacity(0.4), lineWidth: 0.5)
+                                    )
+                                    .matchedGeometryEffect(id: "ACTIVETAB", in: animation)
+                            }
+                            
+                            Text(period.rawValue)
+                                .font(.subheadline)
+                                .fontWeight(selectedPeriod == period ? .bold : .medium)
+                                .foregroundStyle(selectedPeriod == period ? colors.primary : Color.saldoSecondary)
+                        }
+                        .frame(height: 38)
+                        .frame(maxWidth: .infinity)
+                        .contentShape(Rectangle())
                     }
+                    .buttonStyle(.plain)
                 }
-                .padding(4)
-                .background(Color.saldoSecondary.opacity(0.08))
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                Spacer()
             }
-
+            .padding(4)
+            .background(
+                Color.saldoSecondary.opacity(0.06)
+                    .background(.ultraThinMaterial)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                 RoundedRectangle(cornerRadius: 14, style: .continuous)
+                     .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
+            )
             
             Text(selectedPeriod.title)
                 .font(.subheadline)
