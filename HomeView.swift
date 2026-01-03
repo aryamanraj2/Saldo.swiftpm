@@ -15,7 +15,8 @@ struct HomeView: View {
     var body: some View {
         ZStack {
             // Main Content Layer
-            ZStack {
+            NavigationStack {
+                ZStack {
                 // Dynamic Background based on theme
                 CleanBackground(colors: colors)
                 
@@ -36,16 +37,9 @@ struct HomeView: View {
                             }
                             
                             Spacer()
-                            
-                            Button(action: {}) {
-                                Image(systemName: "person.crop.circle")
-                                    .font(.largeTitle)
-                                    .foregroundStyle(colors.primary)
-                                    .animation(.easeInOut, value: colors.primary)
-                            }
                         }
                         .padding(.horizontal, 20)
-                        .padding(.top, 8)
+                        .padding(.top, 60) // Add padding to avoid collision
                         
                         // Main Balance
                         BalanceCard(balance: balance, colors: colors)
@@ -111,9 +105,35 @@ struct HomeView: View {
                         .padding(.bottom, 100) // Fixed padding for native sheet
                     }
                 }
+                .ignoresSafeArea(edges: .top)
             }
             // Smooth transition for all theme changes
             .animation(.easeInOut(duration: 0.5), value: theme)
+                .appStoreStyleToolbar(
+                    triggerOffset: 60,
+                    beforeTrailing: { 
+                        Button(action: {}) {
+                            Image(systemName: "person.crop.circle.fill")
+                                .font(.title3)
+                                .foregroundStyle(colors.primary)
+                        }
+                    },
+                    afterTrailing: { 
+                        Button(action: {}) {
+                            Image(systemName: "person.crop.circle.fill")
+                                .font(.title3)
+                                .foregroundStyle(colors.primary)
+                        }
+                    },
+                    beforeCenter: { EmptyView() },
+                    afterCenter: { 
+                        Text("Saldo")
+                            .font(.headline)
+                            .foregroundStyle(colors.primary)
+                    }
+                )
+                .toolbarBackground(.hidden, for: .navigationBar)
+            }
             
             // Receipt Scanner Sheet (Apple Maps-style)
             ScannerSheetContainer(colors: colors)
