@@ -25,7 +25,7 @@ struct HomeView: View {
                         // Header Area
                         HStack {
                             VStack(alignment: .leading, spacing: 2) {
-                                Text("Good Evening")
+                                Text("Welcome Back!")
                                     .font(.subheadline)
                                     .foregroundStyle(Color.saldoSecondary)
                                 Text("Aryaman")

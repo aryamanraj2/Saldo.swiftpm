@@ -271,7 +271,7 @@ struct ActionButton: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding()
-            .liquidGlass(cornerRadius: 20, shadowColor: colors.primary)
+            .liquidGlass(cornerRadius: 20, material: .regular, shadowColor: colors.accent)
         }
         .buttonStyle(.plain)
     }
@@ -298,7 +298,7 @@ struct WideActionButton: View {
             .padding(.vertical, 16)
             .padding(.horizontal, 20)
             .frame(maxWidth: .infinity)
-            .liquidGlass(cornerRadius: 100, shadowColor: colors.accent)
+            .liquidGlass(cornerRadius: 20, material: .regular, shadowColor: colors.accent)
         }
         .buttonStyle(.plain)
     }
@@ -345,7 +345,6 @@ struct TransactionRow: View {
         }
         .padding(.vertical, 12)
         .padding(.horizontal, 16)
-        .background(Color.saldoCardBackground.opacity(0.4))
-        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .liquidGlass(cornerRadius: 20, material: .regular, shadowColor: colors.accent)
     }
 }
