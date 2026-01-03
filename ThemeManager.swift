@@ -11,30 +11,30 @@ enum AppTheme {
         switch self {
         case .danger:
             return ThemeColors(
-                primary: Color(red: 0.85, green: 0.2, blue: 0.2), // Bright Red
-                secondary: Color(red: 0.6, green: 0.1, blue: 0.1), // Dark Red
-                accent: Color(red: 1.0, green: 0.4, blue: 0.4), // Salmon/Pinkish pop
-                backgroundBlob1: Color.red.opacity(0.35),
-                backgroundBlob2: Color.orange.opacity(0.3),
-                backgroundBlob3: Color(red: 0.5, green: 0.0, blue: 0.0).opacity(0.2)
+                primary: Color.black, // Black
+                secondary: Color(red: 0.4, green: 0.4, blue: 0.4), // Medium Grey
+                accent: Color(red: 0.3, green: 0.3, blue: 0.3), // Dark Grey
+                backgroundBlob1: Color.black.opacity(0.15),
+                backgroundBlob2: Color.gray.opacity(0.12),
+                backgroundBlob3: Color(red: 0.2, green: 0.2, blue: 0.2).opacity(0.1)
             )
         case .moderate:
             return ThemeColors(
-                primary: Color(red: 0.05, green: 0.35, blue: 0.25), // Wealthy Green (Keep readable base)
+                primary: Color.black, // Black
                 secondary: Color.black.opacity(0.6),
-                accent: Color(red: 0.85, green: 0.93, blue: 0.18), // Yellow/Lime
-                backgroundBlob1: Color(red: 0.85, green: 0.93, blue: 0.18).opacity(0.4), // Yellow
-                backgroundBlob2: Color(red: 0.1, green: 0.6, blue: 0.4).opacity(0.2), // Green
-                backgroundBlob3: Color(red: 0.05, green: 0.35, blue: 0.25).opacity(0.15) // Deep Green
+                accent: Color(red: 0.35, green: 0.35, blue: 0.35), // Medium-Dark Grey
+                backgroundBlob1: Color(red: 0.25, green: 0.25, blue: 0.25).opacity(0.2), // Dark Grey
+                backgroundBlob2: Color(red: 0.5, green: 0.5, blue: 0.5).opacity(0.15), // Medium Grey
+                backgroundBlob3: Color(red: 0.15, green: 0.15, blue: 0.15).opacity(0.1) // Very Dark Grey
             )
         case .wealthy:
             return ThemeColors(
-                primary: Color(red: 0.0, green: 0.5, blue: 0.2), // Pure Emerald
-                secondary: Color(red: 0.0, green: 0.3, blue: 0.1),
-                accent: Color(red: 0.2, green: 0.85, blue: 0.55), // Mint Green
-                backgroundBlob1: Color.green.opacity(0.3),
-                backgroundBlob2: Color.mint.opacity(0.25),
-                backgroundBlob3: Color.teal.opacity(0.2)
+                primary: Color.black, // Black
+                secondary: Color(red: 0.3, green: 0.3, blue: 0.3),
+                accent: Color(red: 0.4, green: 0.4, blue: 0.4), // Light-Medium Grey
+                backgroundBlob1: Color.gray.opacity(0.18),
+                backgroundBlob2: Color(red: 0.6, green: 0.6, blue: 0.6).opacity(0.15),
+                backgroundBlob3: Color(red: 0.5, green: 0.5, blue: 0.5).opacity(0.12)
             )
         }
     }

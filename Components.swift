@@ -212,7 +212,7 @@ struct WeeklySpendCard: View {
             HStack(spacing: 4) {
                 Image(systemName: selectedPeriod.isHigher ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
                     .font(.caption)
-                    .foregroundStyle(selectedPeriod.isHigher ? Color.orange : Color.green)
+                    .foregroundStyle(selectedPeriod.isHigher ? Color.black.opacity(0.7) : Color.gray)
                 Text(selectedPeriod.comparison)
                     .font(.caption)
             }

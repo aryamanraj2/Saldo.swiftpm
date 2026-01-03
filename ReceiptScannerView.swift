@@ -319,7 +319,7 @@ struct ExpandedCameraView: View {
                     Button(action: { isFlashOn.toggle() }) {
                         Image(systemName: isFlashOn ? "bolt.fill" : "bolt.slash.fill")
                             .font(.system(size: 20))
-                            .foregroundStyle(isFlashOn ? Color.yellow : Color.white)
+                            .foregroundStyle(Color.white)
                             .frame(width: 52, height: 52)
                             .background(.ultraThinMaterial)
                             .clipShape(Circle())
