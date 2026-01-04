@@ -40,8 +40,8 @@ struct CleanBackground: View {
     
     var body: some View {
         ZStack {
-            // Base layer
-            Color.saldoBackground
+            // Base layer - dynamic theme background
+            colors.background
                 .ignoresSafeArea()
             
             // Dynamic blobs
@@ -80,6 +80,7 @@ struct CleanBackground: View {
             }
         }
         // Animate color changes smoothly
+        .animation(.easeInOut(duration: 0.8), value: colors.background)
         .animation(.easeInOut(duration: 1.0), value: colors.backgroundBlob1)
     }
 }
