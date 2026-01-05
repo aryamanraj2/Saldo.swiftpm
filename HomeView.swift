@@ -1,7 +1,17 @@
 import SwiftUI
+import VisionKit
 
 struct HomeView: View {
     @State private var balance: Double = 4500.0
+    
+    // Camera and scanning state - owned by HomeView to avoid nested sheet issues
+    @State private var showCamera = false
+    @State private var scannedImage: UIImage?
+    @State private var isProcessing = false
+    @State private var scanResult: ReceiptMetadata?
+    @State private var scanError: Error?
+    @State private var showResultSheet = false
+    @State private var showErrorAlert = false
     
     // Computed theme based on balance
     var theme: AppTheme {
@@ -133,10 +143,55 @@ struct HomeView: View {
                     }
                 )
                 .toolbarBackground(.hidden, for: .navigationBar)
+                // Document Camera (VisionKit) - presented from NavigationStack to avoid being blocked by scanner sheet
+                .fullScreenCover(isPresented: $showCamera) {
+                    DocumentCameraWithGallery(
+                        scannedImage: $scannedImage,
+                        isProcessing: $isProcessing,
+                        onCompletion: { result in
+                            showCamera = false
+                            switch result {
+                            case .success(let metadata):
+                                scanResult = metadata
+                                showResultSheet = true
+                            case .failure(let error):
+                                scanError = error
+                                showErrorAlert = true
+                            }
+                        },
+                        onCancel: {
+                            showCamera = false
+                        }
+                    )
+                    .ignoresSafeArea()
+                }
             }
             
-            // Receipt Scanner Sheet (Apple Maps-style)
-            ScannerSheetContainer(colors: colors)
+            // Receipt Scanner Sheet (Apple Maps-style) - passes binding for camera control
+            ScannerSheetContainer(colors: colors, showCamera: $showCamera)
+        }
+        // Scan Result Sheet
+        .sheet(isPresented: $showResultSheet) {
+            if let result = scanResult {
+                ScanResultSheet(metadata: result) {
+                    showResultSheet = false
+                    scanResult = nil
+                }
+            }
+        }
+        // Error Alert
+        .alert("Scan Failed", isPresented: $showErrorAlert) {
+            Button("OK") {
+                scanError = nil
+            }
+        } message: {
+            Text(scanError?.localizedDescription ?? "Unknown error occurred")
+        }
+        // Processing Overlay
+        .overlay {
+            if isProcessing {
+                ProcessingOverlay()
+            }
         }
     }
 }
@@ -144,3 +199,4 @@ struct HomeView: View {
 #Preview {
     HomeView()
 }
+

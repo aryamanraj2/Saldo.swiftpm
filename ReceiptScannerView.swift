@@ -1,5 +1,6 @@
 import SwiftUI
 import AVFoundation
+import VisionKit
 
 // MARK: - Scanner Sheet State (simplified for native sheet)
 enum ScannerSheetState: Equatable {
@@ -9,55 +10,71 @@ enum ScannerSheetState: Equatable {
 
 // MARK: - Scanner Sheet Container (Apple Maps-style)
 // This is the main container that manages the native sheet
+// The camera presentation is handled by the parent view to avoid nested sheet issues
 struct ScannerSheetContainer: View {
     var colors: ThemeColors
+    
+    // Binding to parent's showCamera state - camera will be presented from parent
+    @Binding var showCamera: Bool
     
     @State private var showSheet: Bool = true
     @State private var selectedDetent: PresentationDetent = .height(80)
     @State private var sheetHeight: CGFloat = 0
-    @State private var showCamera = false
     
     // Configuration
     private let smallHeight: CGFloat = 80
     
+    // Check if document scanning is supported
+    private var isDocumentScanningSupported: Bool {
+        VNDocumentCameraViewController.isSupported
+    }
+    
     var body: some View {
-        Color.clear
-            .sheet(isPresented: $showSheet) {
-                ScannerSheetContent(
-                    colors: colors,
-                    selectedDetent: $selectedDetent,
-                    onScanTap: { showCamera = true }
-                )
-                // Read the Sheet's Geometry
-                .overlay {
-                    GeometryReader { proxy in
-                        Color.clear
-                            .preference(key: SheetHeightKey.self, value: proxy.size.height)
-                    }
-                }
-                // Update State when size changes
-                .onPreferenceChange(SheetHeightKey.self) { height in
-                    self.sheetHeight = height
-                }
-                // Sheet Configuration - 2 detents only
-                .presentationDetents([.height(smallHeight), .medium], selection: $selectedDetent)
-                .interactiveDismissDisabled() // Prevents closing the sheet fully
-                .modifier(
-                    PresentationEnhancements(
-                        enableBackgroundInteractionUpThrough: .medium,
-                        cornerRadius: 32
+        // Use a proper container view for the modifiers
+        if #available(iOS 17.0, *) {
+            Color.clear
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .sheet(isPresented: $showSheet) {
+                    ScannerSheetContent(
+                        colors: colors,
+                        selectedDetent: $selectedDetent,
+                        onScanTap: {
+                            print("[Scanner] Scan button tapped")
+                            if isDocumentScanningSupported {
+                                // Request camera presentation from parent
+                                showCamera = true
+                            } else {
+                                print("[Scanner] Document scanning not supported on this device")
+                            }
+                        }
                     )
-                )
-            }
-            .fullScreenCover(isPresented: $showCamera) {
-                ExpandedCameraView(
-                    colors: colors,
-                    showContent: .constant(true),
-                    onClose: { showCamera = false }
-                )
-            }
+                    // Read the Sheet's Geometry
+                    .overlay {
+                        GeometryReader { proxy in
+                            Color.clear
+                                .preference(key: SheetHeightKey.self, value: proxy.size.height)
+                        }
+                    }
+                    // Update State when size changes
+                    .onPreferenceChange(SheetHeightKey.self) { height in
+                        self.sheetHeight = height
+                    }
+                    // Sheet Configuration - 2 detents only
+                    .presentationDetents([.height(smallHeight), .medium], selection: $selectedDetent)
+                    .interactiveDismissDisabled() // Prevents closing the sheet fully
+                    .modifier(
+                        PresentationEnhancements(
+                            enableBackgroundInteractionUpThrough: .medium,
+                            cornerRadius: 32
+                        )
+                    )
+                }
+        } else {
+            // Fallback on earlier versions
+        }
     }
 }
+
 
 // Applies iOS 16.4+ sheet presentation enhancements when available
 private struct PresentationEnhancements: ViewModifier {
@@ -484,7 +501,8 @@ class CameraPreviewUIView: UIView {
         Color.gray.opacity(0.3).ignoresSafeArea()
         
         ScannerSheetContainer(
-            colors: AppTheme.wealthy.colors
+            colors: AppTheme.wealthy.colors,
+            showCamera: .constant(false)
         )
     }
 }
