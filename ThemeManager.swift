@@ -54,6 +54,20 @@ enum AppTheme: Equatable {
             return .wealthy
         }
     }
+    
+    /// Inverted logic for spending: higher spending = danger, lower = wealthy
+    static func fromSpending(spending: Double, maxSpending: Double) -> AppTheme {
+        guard maxSpending > 0 else { return .moderate }
+        let spendingRatio = spending / maxSpending
+        
+        if spendingRatio >= 0.8 {
+            return .danger    // Spending 80%+ of allowance = danger
+        } else if spendingRatio >= 0.4 {
+            return .moderate  // Spending 40-80% = moderate
+        } else {
+            return .wealthy   // Spending <40% = good (green)
+        }
+    }
 }
 
 struct ThemeColors: Equatable {

@@ -18,14 +18,17 @@ struct OnboardingView: View {
     
     // Current theme based on active slide's value
     private var currentTheme: AppTheme {
-        let value: Double
         switch currentPage {
-        case 0: value = Double(allowance)
-        case 1: value = Double(spending)
-        case 2: value = Double(currentBalance)
-        default: value = Double(currentBalance)
+        case 0:
+            return AppTheme.from(balance: Double(allowance))
+        case 1:
+            // Invert logic for spending: higher spending = danger, lower = wealthy
+            return AppTheme.fromSpending(spending: Double(spending), maxSpending: Double(allowance))
+        case 2:
+            return AppTheme.from(balance: Double(currentBalance))
+        default:
+            return AppTheme.from(balance: Double(currentBalance))
         }
-        return AppTheme.from(balance: value)
     }
     
     private var themeColors: ThemeColors {
@@ -56,7 +59,9 @@ struct OnboardingView: View {
                         question: "How much do you spend?",
                         value: $spending,
                         icon: "cart.fill",
-                        subtitle: "Your typical monthly expenses"
+                        subtitle: "Your typical monthly expenses",
+                        maxSliderValue: allowance,  // Cap to monthly allowance
+                        themeOverride: AppTheme.fromSpending(spending: Double(spending), maxSpending: Double(allowance))
                     )
                     .tag(1)
                     
@@ -89,7 +94,9 @@ struct OnboardingView: View {
         question: String,
         value: Binding<Int>,
         icon: String,
-        subtitle: String
+        subtitle: String,
+        maxSliderValue: Int = 50000,  // Default max, can be overridden for spending
+        themeOverride: AppTheme? = nil  // Optional: pass inverted theme for spending
     ) -> some View {
         VStack(spacing: 24) {
             Spacer()
@@ -111,15 +118,17 @@ struct OnboardingView: View {
                 .foregroundStyle(themeColors.secondary)
                 .padding(.bottom, 8)
             
+            Spacer()
+            
             // Slider
             OnboardingSlider(
                 question: question,
                 value: value,
-                maxValue: 50000,
-                step: 500
+                maxValue: maxSliderValue,
+                step: 500,
+                themeOverride: themeOverride
             )
             
-            Spacer()
             Spacer()
         }
         .padding(.horizontal, 16)

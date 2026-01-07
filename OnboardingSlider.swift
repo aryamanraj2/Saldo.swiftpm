@@ -19,6 +19,7 @@ struct OnboardingSlider: View {
     @Binding var value: Int  // Value in rupees (0, 500, 1000, etc.)
     let maxValue: Int
     let step: Int
+    var themeOverride: AppTheme? = nil  // Optional: use parent's theme instead of calculating
     
     // Configuration
     private let config = OnboardingTickConfig()
@@ -44,9 +45,9 @@ struct OnboardingSlider: View {
         config.tickWidth + (config.tickHPadding * 2)
     }
     
-    // Theme based on current value
+    // Theme based on current value (or use override from parent)
     private var currentTheme: AppTheme {
-        AppTheme.from(balance: Double(value))
+        themeOverride ?? AppTheme.from(balance: Double(value))
     }
     
     private var themeColors: ThemeColors {
@@ -66,6 +67,8 @@ struct OnboardingSlider: View {
             // Value display with Liquid Glass
             valueDisplay
             
+            Spacer()
+            
             // Tick Picker
             tickPicker
             
@@ -82,10 +85,6 @@ struct OnboardingSlider: View {
                 .font(.system(size: 56, weight: .bold, design: .rounded))
                 .foregroundStyle(themeColors.primary)
                 .contentTransition(.numericText(value: Double(value)))
-            
-            Text(valueDescription)
-                .font(.subheadline)
-                .foregroundStyle(themeColors.secondary)
         }
         .padding(.horizontal, 32)
         .padding(.vertical, 20)
@@ -104,17 +103,6 @@ struct OnboardingSlider: View {
             }
         }
         return "\(value)"
-    }
-    
-    private var valueDescription: String {
-        switch currentTheme {
-        case .danger:
-            return "Low range"
-        case .moderate:
-            return "Moderate range"
-        case .wealthy:
-            return "Healthy range"
-        }
     }
     
     // MARK: - Tick Picker
