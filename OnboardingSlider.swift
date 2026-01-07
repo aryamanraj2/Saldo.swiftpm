@@ -186,7 +186,9 @@ struct OnboardingSlider: View {
         }
         .allowsHitTesting(isInitialSetupDone)
         .onChange(of: tickIndex) { _, newValue in
-            value = newValue * step
+            withAnimation(.snappy(duration: 0.4, extraBounce: 0.1)) {
+                value = newValue * step
+            }
         }
         .onChange(of: value) { _, newValue in
             let newTick = newValue / step

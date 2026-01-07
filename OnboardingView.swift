@@ -80,23 +80,7 @@ struct OnboardingView: View {
     
     // MARK: - Header
     private var header: some View {
-        VStack(spacing: 8) {
-            // App logo/icon
-            Image(systemName: "chart.line.uptrend.xyaxis.circle.fill")
-                .font(.system(size: 48))
-                .foregroundStyle(themeColors.accent)
-                .padding(.top, 60)
-            
-            Text("Saldo")
-                .font(.title)
-                .fontWeight(.bold)
-                .foregroundStyle(themeColors.primary)
-            
-            Text("Let's set up your finances")
-                .font(.subheadline)
-                .foregroundStyle(themeColors.secondary)
-                .padding(.bottom, 20)
-        }
+        EmptyView()
     }
     
     // MARK: - Slide Content
