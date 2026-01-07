@@ -10,7 +10,7 @@ import AppleProductTypes
 let package = Package(
     name: "Saldo",
     platforms: [
-        .iOS("16.0")
+        .iOS("26.0")
     ],
     products: [
         .iOSApplication(
