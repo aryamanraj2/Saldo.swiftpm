@@ -16,6 +16,10 @@ struct OnboardingView: View {
     // Animation
     @Namespace private var namespace
     
+    // Transition State
+    @State private var showTransition = false
+    @State private var transitionQuote = ""
+    
     // Current theme based on active slide's value
     private var currentTheme: AppTheme {
         switch currentPage {
@@ -31,6 +35,11 @@ struct OnboardingView: View {
         }
     }
     
+    // Theme for the transition screen (based on final spending status)
+    private var transitionTheme: AppTheme {
+        AppTheme.fromSpending(spending: Double(spending), maxSpending: Double(allowance))
+    }
+    
     private var themeColors: ThemeColors {
         currentTheme.colors
     }
@@ -38,7 +47,7 @@ struct OnboardingView: View {
     var body: some View {
         ZStack {
             // Dynamic animated background
-            CleanBackground(colors: themeColors)
+            CleanBackground(colors: showTransition ? transitionTheme.colors : themeColors)
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
@@ -74,13 +83,22 @@ struct OnboardingView: View {
                     .tag(2)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
-                .animation(.easeInOut(duration: 0.4), value: currentPage)
+
                 
                 // Bottom controls
                 bottomControls
             }
+            .opacity(showTransition ? 0 : 1) // Hide main content during transition
+            
+            // Transition View
+            if showTransition {
+                QuoteTransitionView(quote: transitionQuote, themeColors: transitionTheme.colors)
+                    .transition(.opacity)
+                    .zIndex(1)
+            }
         }
         .animation(.easeInOut(duration: 0.5), value: currentTheme)
+        .animation(.easeInOut(duration: 0.5), value: showTransition)
     }
     
     // MARK: - Header
@@ -189,8 +207,42 @@ struct OnboardingView: View {
         }
     }
     
+    // MARK: - Quotes Logic
+    private func getQuote() -> String {
+        let percentage = Double(spending) / Double(max(allowance, 1)) * 100
+        
+        if percentage < 20 {
+            // Low Spending
+            let quotes = [
+                "Look at you, the Master of Coin. Tywin Lannister would be proud."
+            
+            ]
+            return quotes.randomElement() ?? quotes[0]
+            
+        } else if percentage <= 60 {
+            // Moderate Spending
+            let quotes = [
+                "\"Perfectly balanced, as all things should be.\"",
+                "Not great, not terrible.",
+                "Living your best life without the 'Low Balance' notifications. Respect"
+            ]
+            return quotes.randomElement() ?? quotes[0]
+            
+        } else {
+            // High Spending (> 60%)
+            let quotes = [
+                "Treat yo' self! (But maybe stop treating yo' self for the rest of the month?)",
+                "Houston, we have a problem."
+            ]
+            return quotes.randomElement() ?? quotes[0]
+        }
+    }
+    
     // MARK: - Complete Onboarding
     private func completeOnboarding() {
+        // Generate quote
+        transitionQuote = getQuote()
+        
         // Save user data
         UserDefaults.standard.set(allowance, forKey: "userAllowance")
         UserDefaults.standard.set(spending, forKey: "userSpending")
@@ -200,9 +252,16 @@ struct OnboardingView: View {
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.success)
         
-        // Complete onboarding
+        // Start Transition
         withAnimation(.easeInOut(duration: 0.5)) {
-            isOnboardingComplete = true
+            showTransition = true
+        }
+        
+        // Delay before actually completing
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+            withAnimation(.easeOut(duration: 0.5)) {
+                isOnboardingComplete = true
+            }
         }
     }
 }
