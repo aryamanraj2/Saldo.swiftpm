@@ -34,7 +34,7 @@ struct OnboardingSlider: View {
     
     // Haptic feedback
 
-    private let selectionGenerator = UISelectionFeedbackGenerator()
+    private let feedbackGenerator = UIImpactFeedbackGenerator(style: .rigid)
     
     // Computed properties
     private var tickCount: Int {
@@ -162,8 +162,7 @@ struct OnboardingSlider: View {
             guard !isInitialSetupDone else { return }
             
             // Prepare haptic generators
-
-            selectionGenerator.prepare()
+            feedbackGenerator.prepare()
             
             // Set initial position from value
             let initialTick = value / step
@@ -259,7 +258,7 @@ struct OnboardingSlider: View {
     
     private func triggerFeedback() {
         // Haptic feedback - using selection change for slider feel
-        selectionGenerator.selectionChanged()
+        feedbackGenerator.impactOccurred()
         
         // Sound feedback (system tick sound 1157)
         let systemSoundID: SystemSoundID = 1157

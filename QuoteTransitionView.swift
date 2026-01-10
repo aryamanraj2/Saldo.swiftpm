@@ -44,6 +44,10 @@ struct QuoteTransitionView: View {
             }
         }
         .onAppear {
+            // Strong haptic for transition entry
+            let generator = UIImpactFeedbackGenerator(style: .heavy)
+            generator.impactOccurred()
+            
             withAnimation(.easeOut(duration: 0.8)) {
                 opacity = 1
             }
