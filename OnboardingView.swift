@@ -91,11 +91,11 @@ struct OnboardingView: View {
             .opacity(showTransition ? 0 : 1) // Hide main content during transition
             
             // Transition View
-            if showTransition {
-                QuoteTransitionView(quote: transitionQuote, themeColors: transitionTheme.colors)
-                    .transition(.opacity)
-                    .zIndex(1)
-            }
+            // if showTransition {
+            //     QuoteTransitionView(quote: transitionQuote, themeColors: transitionTheme.colors)
+            //         .transition(.opacity)
+            //         .zIndex(1)
+            // }
         }
         .animation(.easeInOut(duration: 0.5), value: currentTheme)
         .animation(.easeInOut(duration: 0.5), value: showTransition)
@@ -253,16 +253,16 @@ struct OnboardingView: View {
         generator.notificationOccurred(.success)
         
         // Start Transition
-        withAnimation(.easeInOut(duration: 0.5)) {
-            showTransition = true
-        }
+        // withAnimation(.easeInOut(duration: 0.5)) {
+        //     showTransition = true
+        // }
         
         // Delay before actually completing
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+        // DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
             withAnimation(.easeOut(duration: 0.5)) {
                 isOnboardingComplete = true
             }
-        }
+        // }
     }
 }
 
