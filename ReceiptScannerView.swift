@@ -8,6 +8,12 @@ enum ScannerSheetState: Equatable {
     case medium   // Medium detent: expanded content
 }
 
+// MARK: - Presentation Detent Extensions
+extension PresentationDetent {
+    static let scannerSmall = PresentationDetent.height(80)
+    static let scannerMedium = PresentationDetent.fraction(0.28)
+}
+
 // MARK: - Scanner Sheet Container (Apple Maps-style)
 // This is the main container that manages the native sheet
 // The camera presentation is handled by the parent view to avoid nested sheet issues
@@ -17,12 +23,11 @@ struct ScannerSheetContainer: View {
     // Binding to parent's showCamera state - camera will be presented from parent
     @Binding var showCamera: Bool
     
-    @State private var showSheet: Bool = true
-    @State private var selectedDetent: PresentationDetent = .height(80)
-    @State private var sheetHeight: CGFloat = 0
+    // Binding to control detent from parent (e.g. collapse on scroll)
+    @Binding var selectedDetent: PresentationDetent
     
-    // Configuration
-    private let smallHeight: CGFloat = 80
+    @State private var showSheet: Bool = true
+    @State private var sheetHeight: CGFloat = 0
     
     // Check if document scanning is supported
     private var isDocumentScanningSupported: Bool {
@@ -60,11 +65,11 @@ struct ScannerSheetContainer: View {
                         self.sheetHeight = height
                     }
                     // Sheet Configuration - 2 detents only
-                    .presentationDetents([.height(smallHeight), .medium], selection: $selectedDetent)
+                    .presentationDetents([.scannerSmall, .scannerMedium], selection: $selectedDetent)
                     .interactiveDismissDisabled() // Prevents closing the sheet fully
                     .modifier(
                         PresentationEnhancements(
-                            enableBackgroundInteractionUpThrough: .medium,
+                            enableBackgroundInteractionUpThrough: .scannerMedium,
                             cornerRadius: 32
                         )
                     )
@@ -98,18 +103,16 @@ struct ScannerSheetContent: View {
     @Binding var selectedDetent: PresentationDetent
     var onScanTap: () -> Void
     
-    private let smallHeight: CGFloat = 80
-    
     var body: some View {
         VStack(spacing: 0) {
             // MARK: - Floating Search Bar (Always Visible - Like Apple Maps)
             FloatingScanBar(colors: colors, onScanTap: onScanTap)
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
-                .padding(.bottom, selectedDetent == .height(smallHeight) ? 12 : 16)
+                .padding(.bottom, selectedDetent == .scannerSmall ? 12 : 16)
             
             // MARK: - Expanded Content (Only in Medium Detent)
-            if selectedDetent != .height(smallHeight) {
+            if selectedDetent != .scannerSmall {
                 ExpandedSheetContent(colors: colors)
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
@@ -215,7 +218,7 @@ struct GrillsPlaceholder: View {
             GridItem(.flexible(), spacing: 12),
             GridItem(.flexible(), spacing: 12)
         ], spacing: 12) {
-            ForEach(0..<6, id: \.self) { index in
+            ForEach(0..<3, id: \.self) { index in
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(Color.saldoSecondary.opacity(0.06))
                     .frame(height: 60)
@@ -502,7 +505,8 @@ class CameraPreviewUIView: UIView {
         
         ScannerSheetContainer(
             colors: AppTheme.wealthy.colors,
-            showCamera: .constant(false)
+            showCamera: .constant(false),
+            selectedDetent: .constant(.scannerMedium)
         )
     }
 }

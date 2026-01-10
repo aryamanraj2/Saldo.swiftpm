@@ -13,6 +13,9 @@ struct HomeView: View {
     @State private var showResultSheet = false
     @State private var showErrorAlert = false
     
+    // Sheet Detent State (Controlled by HomeView)
+    @State private var sheetDetent: PresentationDetent = .scannerMedium
+    
     // Computed theme based on balance
     var theme: AppTheme {
         AppTheme.from(balance: balance)
@@ -115,6 +118,14 @@ struct HomeView: View {
                         .padding(.bottom, 100) // Fixed padding for native sheet
                     }
                 }
+                // Auto-collapse sheet on scroll
+                .simultaneousGesture(
+                    DragGesture().onChanged { _ in
+                        if sheetDetent != .scannerSmall {
+                            sheetDetent = .scannerSmall
+                        }
+                    }
+                )
                 .ignoresSafeArea(edges: .top)
             }
             // Smooth transition for all theme changes
@@ -168,7 +179,11 @@ struct HomeView: View {
             }
             
             // Receipt Scanner Sheet (Apple Maps-style) - passes binding for camera control
-            ScannerSheetContainer(colors: colors, showCamera: $showCamera)
+            ScannerSheetContainer(
+                colors: colors,
+                showCamera: $showCamera,
+                selectedDetent: $sheetDetent
+            )
         }
         // Scan Result Sheet
         .sheet(isPresented: $showResultSheet) {
