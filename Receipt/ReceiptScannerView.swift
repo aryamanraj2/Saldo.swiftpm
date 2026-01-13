@@ -110,6 +110,7 @@ struct ScannerSheetContent: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
                 .padding(.bottom, selectedDetent == .scannerSmall ? 12 : 16)
+                .tutorialHighlight(.scanReceipt)
             
             // MARK: - Expanded Content (Only in Medium Detent)
             if selectedDetent != .scannerSmall {
@@ -202,6 +203,7 @@ struct ExpandedSheetContent: View {
             // Grills Placeholder Grid
             GrillsPlaceholder(colors: colors)
                 .padding(.horizontal, 16)
+                .tutorialHighlight(.grills)
             
             Spacer()
         }

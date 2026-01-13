@@ -57,6 +57,7 @@ struct HomeView: View {
                         // Main Balance
                         BalanceCard(balance: balance, colors: colors)
                             .padding(.horizontal, 20)
+                            .tutorialHighlight(.remainingBalance)
                         
                         // Grid Section
                         HStack(alignment: .top, spacing: 12) {
@@ -79,6 +80,7 @@ struct HomeView: View {
                                     colors: colors,
                                     action: {}
                                 )
+                                .tutorialHighlight(.getInsights)
                             }
                             .frame(maxWidth: .infinity)
                         }
