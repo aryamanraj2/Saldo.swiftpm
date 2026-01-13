@@ -5,16 +5,23 @@ import SwiftUI
 @MainActor
 class OnboardingManager: ObservableObject {
     static let shared = OnboardingManager()
-    
+
     // Persistence keys
     private enum Keys {
         static let hasCompletedOnboarding = "hasCompletedOnboarding"
+        static let userName = "userName"
         static let userAllowance = "userAllowance"
         static let userSpending = "userSpending"
         static let userBalance = "userBalance"
     }
-    
+
     // Published properties for SwiftUI observation
+    @Published var userName: String {
+        didSet {
+            UserDefaults.standard.set(userName, forKey: Keys.userName)
+        }
+    }
+
     @Published var hasCompletedOnboarding: Bool {
         didSet {
             UserDefaults.standard.set(hasCompletedOnboarding, forKey: Keys.hasCompletedOnboarding)
@@ -51,14 +58,16 @@ class OnboardingManager: ObservableObject {
     
     init() {
         self.hasCompletedOnboarding = UserDefaults.standard.bool(forKey: Keys.hasCompletedOnboarding)
+        self.userName = UserDefaults.standard.string(forKey: Keys.userName) ?? ""
         self.userAllowance = UserDefaults.standard.integer(forKey: Keys.userAllowance)
         self.userSpending = UserDefaults.standard.integer(forKey: Keys.userSpending)
         self.userBalance = UserDefaults.standard.integer(forKey: Keys.userBalance)
     }
-    
+
     // Reset onboarding for testing
     func resetOnboarding() {
         hasCompletedOnboarding = false
+        userName = ""
         userAllowance = 0
         userSpending = 0
         userBalance = 0

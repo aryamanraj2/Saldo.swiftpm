@@ -3,7 +3,10 @@ import VisionKit
 
 struct HomeView: View {
     @State private var balance: Double = 4500.0
-    
+
+    // User name from onboarding
+    @AppStorage("userName") private var userName: String = ""
+
     // Camera and scanning state - owned by HomeView to avoid nested sheet issues
     @State private var showCamera = false
     @State private var scannedImage: UIImage?
@@ -42,13 +45,13 @@ struct HomeView: View {
                                 Text("Welcome Back!")
                                     .font(.subheadline)
                                     .foregroundStyle(Color.saldoSecondary)
-                                Text("Aryaman")
+                                Text(userName.isEmpty ? "Friend" : userName)
                                     .font(.title)
                                     .fontWeight(.bold)
                                     .foregroundStyle(colors.primary)
                                     .animation(.easeInOut, value: colors.primary)
                             }
-                            
+
                             Spacer()
                         }
                         .padding(.horizontal, 20)

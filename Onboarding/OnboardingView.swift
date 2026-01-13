@@ -1,34 +1,41 @@
 import SwiftUI
 
 // MARK: - Onboarding View
-/// Main onboarding screen with 3 financial question slides
+/// Main onboarding screen with name input + 3 financial question slides
 struct OnboardingView: View {
     @Binding var isOnboardingComplete: Bool
-    
+
     // Slide state
     @State private var currentPage = 0
-    
+
+    // User data
+    @State private var userName = ""
+    @FocusState private var isNameFieldFocused: Bool
+
     // User financial data
     @State private var allowance = 5000
     @State private var spending = 3000
     @State private var currentBalance = 2000
-    
+
     // Animation
     @Namespace private var namespace
-    
+
     // Transition State
     @State private var showTransition = false
     @State private var transitionQuote = ""
-    
+
     // Current theme based on active slide's value
     private var currentTheme: AppTheme {
         switch currentPage {
         case 0:
-            return AppTheme.from(balance: Double(allowance))
+            // Name input - use a welcoming wealthy green theme
+            return .wealthy
         case 1:
+            return AppTheme.from(balance: Double(allowance))
+        case 2:
             // Invert logic for spending: higher spending = danger, lower = wealthy
             return AppTheme.fromSpending(spending: Double(spending), maxSpending: Double(allowance))
-        case 2:
+        case 3:
             return AppTheme.from(balance: Double(currentBalance))
         default:
             return AppTheme.from(balance: Double(currentBalance))
@@ -56,31 +63,38 @@ struct OnboardingView: View {
                 
                 // Page content
                 TabView(selection: $currentPage) {
+                    // Page 0: Name Input
+                    nameInputSlide
+                        .tag(0)
+
+                    // Page 1: Allowance
                     slideContent(
                         question: "How much is your allowance?",
                         value: $allowance,
                         icon: "wallet.bifold.fill",
                         subtitle: "Your monthly income or pocket money"
                     )
-                    .tag(0)
-                    
+                    .tag(1)
+
+                    // Page 2: Spending
                     slideContent(
                         question: "How much do you spend?",
                         value: $spending,
                         icon: "cart.fill",
                         subtitle: "Your typical monthly expenses",
-                        maxSliderValue: allowance,  // Cap to monthly allowance
+                        maxSliderValue: allowance,
                         themeOverride: AppTheme.fromSpending(spending: Double(spending), maxSpending: Double(allowance))
                     )
-                    .tag(1)
-                    
+                    .tag(2)
+
+                    // Page 3: Balance
                     slideContent(
                         question: "What's your current balance?",
                         value: $currentBalance,
                         icon: "indianrupeesign.circle.fill",
                         subtitle: "The amount you have right now"
                     )
-                    .tag(2)
+                    .tag(3)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
 
@@ -105,7 +119,77 @@ struct OnboardingView: View {
     private var header: some View {
         EmptyView()
     }
-    
+
+    // MARK: - Name Input Slide
+    private var nameInputSlide: some View {
+        VStack(spacing: 32) {
+            Spacer()
+
+            // Greeting icon with glass effect
+            if #available(iOS 26.0, *) {
+                Image(systemName: "hand.wave.fill")
+                    .font(.system(size: 44))
+                    .foregroundStyle(themeColors.accent)
+                    .frame(width: 80, height: 80)
+                    .glassEffect(.regular.tint(themeColors.accent.opacity(0.2)))
+                    .symbolEffect(.wiggle, options: .repeat(2))
+            }
+
+            // Question text
+            VStack(spacing: 8) {
+                Text("Hey,")
+                    .font(.system(size: 34, weight: .bold, design: .rounded))
+                    .foregroundStyle(themeColors.primary)
+
+                Text("What's your name?")
+                    .font(.system(size: 34, weight: .bold, design: .rounded))
+                    .foregroundStyle(themeColors.primary)
+            }
+
+            // Elegant text field with liquid glass
+            if #available(iOS 26.0, *) {
+                TextField("", text: $userName, prompt: Text("Enter your name")
+                    .foregroundStyle(themeColors.secondary.opacity(0.6)))
+                    .font(.system(size: 24, weight: .medium, design: .rounded))
+                    .foregroundStyle(themeColors.primary)
+                    .multilineTextAlignment(.center)
+                    .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled()
+                    .focused($isNameFieldFocused)
+                    .submitLabel(.next)
+                    .onSubmit {
+                        if canProceed {
+                            isNameFieldFocused = false
+                            withAnimation(.easeInOut(duration: 0.4)) {
+                                currentPage += 1
+                            }
+                            let generator = UIImpactFeedbackGenerator(style: .medium)
+                            generator.impactOccurred()
+                        }
+                    }
+                    .padding(.vertical, 20)
+                    .padding(.horizontal, 32)
+                    .glassEffect(.regular.tint(themeColors.accent.opacity(0.15)), in: .capsule)
+                    .padding(.horizontal, 24)
+            }
+
+            // Subtle hint
+            Text("This is how we'll greet you")
+                .font(.subheadline)
+                .foregroundStyle(themeColors.secondary)
+
+            Spacer()
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .onAppear {
+            // Auto-focus the text field with a slight delay for smooth transition
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                isNameFieldFocused = true
+            }
+        }
+    }
+
     // MARK: - Slide Content
     @ViewBuilder
     private func slideContent(
@@ -167,7 +251,7 @@ struct OnboardingView: View {
     
     private var pageIndicators: some View {
         HStack(spacing: 8) {
-            ForEach(0..<3, id: \.self) { index in
+            ForEach(0..<4, id: \.self) { index in
                 Capsule()
                     .fill(index == currentPage ? themeColors.accent : themeColors.primary.opacity(0.2))
                     .frame(width: index == currentPage ? 24 : 8, height: 8)
@@ -175,10 +259,22 @@ struct OnboardingView: View {
             }
         }
     }
-    
+
+    // Check if can proceed from current page
+    private var canProceed: Bool {
+        if currentPage == 0 {
+            return !userName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        return true
+    }
+
     private var actionButton: some View {
         Button {
-            if currentPage < 2 {
+            if currentPage < 3 {
+                // Dismiss keyboard if on name page
+                if currentPage == 0 {
+                    isNameFieldFocused = false
+                }
                 withAnimation(.easeInOut(duration: 0.4)) {
                     currentPage += 1
                 }
@@ -191,20 +287,21 @@ struct OnboardingView: View {
         } label: {
             if #available(iOS 26.0, *) {
                 HStack(spacing: 8) {
-                    Text(currentPage < 2 ? "Continue" : "Get Started")
+                    Text(currentPage < 3 ? "Continue" : "Get Started")
                         .fontWeight(.semibold)
-                    
-                    Image(systemName: currentPage < 2 ? "arrow.right" : "checkmark")
+
+                    Image(systemName: currentPage < 3 ? "arrow.right" : "checkmark")
                         .font(.body.weight(.semibold))
                 }
-                .foregroundStyle(themeColors.primary)
+                .foregroundStyle(canProceed ? themeColors.primary : themeColors.primary.opacity(0.4))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
-                .glassEffect(.regular.interactive().tint(themeColors.accent.opacity(0.3)), in: .capsule)
+                .glassEffect(.regular.interactive().tint(themeColors.accent.opacity(canProceed ? 0.3 : 0.1)), in: .capsule)
             } else {
                 // Fallback on earlier versions
             }
         }
+        .disabled(!canProceed)
     }
     
     // MARK: - Quotes Logic
@@ -242,8 +339,10 @@ struct OnboardingView: View {
     private func completeOnboarding() {
         // Generate quote
         transitionQuote = getQuote()
-        
+
         // Save user data
+        let trimmedName = userName.trimmingCharacters(in: .whitespacesAndNewlines)
+        UserDefaults.standard.set(trimmedName, forKey: "userName")
         UserDefaults.standard.set(allowance, forKey: "userAllowance")
         UserDefaults.standard.set(spending, forKey: "userSpending")
         UserDefaults.standard.set(currentBalance, forKey: "userBalance")
