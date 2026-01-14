@@ -14,9 +14,7 @@ struct MyApp: App {
                         hasCompletedTutorial = true
                     }
                     .onAppear {
-                        // Show tutorial if onboarding done but tutorial not completed
                         if !hasCompletedTutorial {
-                            // Quick delay to let views render
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                                 showTutorial = true
                             }
