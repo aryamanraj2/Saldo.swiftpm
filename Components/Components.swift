@@ -14,15 +14,24 @@ struct LiquidGlass: ViewModifier {
     var cornerRadius: CGFloat = 20
     var material: Material = .ultraThinMaterial
     var shadowColor: Color
-    
+    @Environment(\.colorScheme) var colorScheme
+
     func body(content: Content) -> some View {
         content
             .background(material)
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-            .shadow(color: shadowColor.opacity(0.15), radius: 15, x: 0, y: 10)
+            .shadow(
+                color: shadowColor.opacity(colorScheme == .dark ? 0.25 : 0.15),
+                radius: colorScheme == .dark ? 20 : 15,
+                x: 0,
+                y: colorScheme == .dark ? 8 : 10
+            )
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(.white.opacity(0.2), lineWidth: 1)
+                    .strokeBorder(
+                        Color.white.opacity(colorScheme == .dark ? 0.12 : 0.2),
+                        lineWidth: 1
+                    )
             )
     }
 }
@@ -36,37 +45,43 @@ extension View {
 // MARK: - Dynamic Background
 struct CleanBackground: View {
     var colors: ThemeColors
+    @Environment(\.colorScheme) var colorScheme
     @State private var animate = false
-    
+
+    // Blur values - slightly more in dark mode for subtle glow
+    private var blob1Blur: CGFloat { colorScheme == .dark ? 100 : 80 }
+    private var blob2Blur: CGFloat { colorScheme == .dark ? 120 : 100 }
+    private var blob3Blur: CGFloat { colorScheme == .dark ? 110 : 90 }
+
     var body: some View {
         ZStack {
             // Base layer - dynamic theme background
             colors.background
                 .ignoresSafeArea()
-            
-            // Dynamic blobs
+
+            // Dynamic blobs with subtle glow in dark mode
             GeometryReader { proxy in
                 ZStack {
                     // Top Right
                     Circle()
                         .fill(colors.backgroundBlob1)
-                        .blur(radius: 80)
+                        .blur(radius: blob1Blur)
                         .frame(width: 300, height: 300)
                         .position(x: proxy.size.width * 0.9, y: proxy.size.height * 0.1)
                         .offset(x: animate ? -30 : 30, y: animate ? -30 : 30)
-                    
+
                     // Center Left
                     Circle()
                         .fill(colors.backgroundBlob2)
-                        .blur(radius: 100)
+                        .blur(radius: blob2Blur)
                         .frame(width: 400, height: 400)
                         .position(x: 0, y: proxy.size.height * 0.4)
                         .offset(x: animate ? 20 : -20, y: animate ? 40 : -40)
-                    
+
                     // Bottom Right
                     Circle()
                         .fill(colors.backgroundBlob3)
-                        .blur(radius: 90)
+                        .blur(radius: blob3Blur)
                         .frame(width: 350, height: 350)
                         .position(x: proxy.size.width, y: proxy.size.height * 0.85)
                         .offset(x: animate ? -40 : 40, y: animate ? -20 : 20)
@@ -97,7 +112,7 @@ struct BalanceCard: View {
                 .fontWeight(.medium)
                 .foregroundStyle(Color.saldoSecondary)
             
-            Text("₹\(String(format: "%.2f", balance))")
+            (Text("₹") + Text(balance, format: .number.precision(.fractionLength(2))))
                 .contentTransition(.numericText()) // Smooth number transition
                 .font(.system(size: 48, weight: .bold, design: .rounded))
                 .foregroundStyle(colors.primary)
@@ -498,33 +513,39 @@ struct TransactionRow: View {
     var subtitle: String = "Just now"
     var amount: String = "₹0.00"
     var colors: ThemeColors
-    
+    @Environment(\.colorScheme) var colorScheme
+
     var body: some View {
         HStack(spacing: 16) {
             ZStack {
                 Circle()
-                    .fill(Color.white)
+                    .fill(colorScheme == .dark ? Color.white.opacity(0.1) : Color.white)
                     .frame(width: 48, height: 48)
-                    .shadow(color: Color.black.opacity(0.03), radius: 4, x: 0, y: 2)
-                
+                    .shadow(
+                        color: Color.black.opacity(colorScheme == .dark ? 0.15 : 0.03),
+                        radius: 4,
+                        x: 0,
+                        y: 2
+                    )
+
                 Image(systemName: icon)
                     .font(.body)
                     .foregroundStyle(colors.primary)
             }
-            
+
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(.body)
                     .fontWeight(.semibold)
                     .foregroundStyle(Color.saldoPrimary)
-                
+
                 Text(subtitle)
                     .font(.caption)
                     .foregroundStyle(Color.saldoSecondary)
             }
-            
+
             Spacer()
-            
+
             Text(amount)
                 .font(.body)
                 .fontWeight(.bold)

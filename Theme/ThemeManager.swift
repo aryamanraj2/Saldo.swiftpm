@@ -6,8 +6,26 @@ enum AppTheme: Equatable {
     case danger   // Low balance (< 1000) - Warm Reds
     case moderate // Medium balance (1000 - 5000) - Yellow-Greens
     case wealthy  // High balance (> 5000) - Deep Greens
-    
+
+    // MARK: - Color Scheme Aware Colors
+
+    func colors(for colorScheme: ColorScheme) -> ThemeColors {
+        switch colorScheme {
+        case .dark:
+            return darkColors
+        default:
+            return lightColors
+        }
+    }
+
+    // Keep existing `colors` for backward compatibility
     var colors: ThemeColors {
+        return lightColors
+    }
+
+    // MARK: - Light Mode Colors
+
+    private var lightColors: ThemeColors {
         switch self {
         case .danger:
             // Warm reds with rose-cream background
@@ -41,6 +59,46 @@ enum AppTheme: Equatable {
                 backgroundBlob1: Color(hex: "24873A").opacity(0.12),
                 backgroundBlob2: Color(hex: "4CAF50").opacity(0.15),
                 backgroundBlob3: Color(hex: "0B5D1E").opacity(0.08)
+            )
+        }
+    }
+
+    // MARK: - Dark Mode Colors
+
+    private var darkColors: ThemeColors {
+        switch self {
+        case .danger:
+            // Dark burgundy background with rose-cream text
+            return ThemeColors(
+                background: Color(hex: "1F1614"),           // Dark burgundy-brown
+                primary: Color(hex: "F5DED3"),              // Rose-cream for text
+                secondary: Color(hex: "F5DED3").opacity(0.7),
+                accent: Color(hex: "FF8A83"),               // Brighter coral accent
+                backgroundBlob1: Color(hex: "FF746C").opacity(0.18),
+                backgroundBlob2: Color(hex: "F8DAC7").opacity(0.12),
+                backgroundBlob3: Color(hex: "FF746C").opacity(0.10)
+            )
+        case .moderate:
+            // Dark olive background with cream text
+            return ThemeColors(
+                background: Color(hex: "1A1C14"),           // Dark olive-charcoal
+                primary: Color(hex: "E8F0D7"),              // Light yellow-cream for text
+                secondary: Color(hex: "E8F0D7").opacity(0.65),
+                accent: Color(hex: "8EC24E"),               // Brighter lime accent
+                backgroundBlob1: Color(hex: "7BAF3F").opacity(0.15),
+                backgroundBlob2: Color(hex: "A8C974").opacity(0.12),
+                backgroundBlob3: Color(hex: "7BAF3F").opacity(0.10)
+            )
+        case .wealthy:
+            // Deep forest background with mint-cream text
+            return ThemeColors(
+                background: Color(hex: "121A14"),           // Deep forest dark
+                primary: Color(hex: "E8F1E0"),              // Light mint-cream for text
+                secondary: Color(hex: "E8F1E0").opacity(0.65),
+                accent: Color(hex: "32A64C"),               // Brighter green accent
+                backgroundBlob1: Color(hex: "24873A").opacity(0.18),
+                backgroundBlob2: Color(hex: "4CAF50").opacity(0.12),
+                backgroundBlob3: Color(hex: "24873A").opacity(0.10)
             )
         }
     }

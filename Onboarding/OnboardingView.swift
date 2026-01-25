@@ -4,6 +4,7 @@ import SwiftUI
 /// Main onboarding screen with name input + 3 financial question slides
 struct OnboardingView: View {
     @Binding var isOnboardingComplete: Bool
+    @Environment(\.colorScheme) var colorScheme
 
     // Slide state
     @State private var currentPage = 0
@@ -41,20 +42,20 @@ struct OnboardingView: View {
             return AppTheme.from(balance: Double(currentBalance))
         }
     }
-    
+
     // Theme for the transition screen (based on final spending status)
     private var transitionTheme: AppTheme {
         AppTheme.fromSpending(spending: Double(spending), maxSpending: Double(allowance))
     }
-    
+
     private var themeColors: ThemeColors {
-        currentTheme.colors
+        currentTheme.colors(for: colorScheme)
     }
     
     var body: some View {
         ZStack {
             // Dynamic animated background
-            CleanBackground(colors: showTransition ? transitionTheme.colors : themeColors)
+            CleanBackground(colors: showTransition ? transitionTheme.colors(for: colorScheme) : themeColors)
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
@@ -182,11 +183,10 @@ struct OnboardingView: View {
             Spacer()
         }
         .padding(.horizontal, 16)
-        .onAppear {
+        .task {
             // Auto-focus the text field with a slight delay for smooth transition
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                isNameFieldFocused = true
-            }
+            try? await Task.sleep(for: .seconds(0.5))
+            isNameFieldFocused = true
         }
     }
 

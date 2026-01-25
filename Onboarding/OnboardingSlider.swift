@@ -20,10 +20,11 @@ struct OnboardingSlider: View {
     let maxValue: Int
     let step: Int
     var themeOverride: AppTheme? = nil  // Optional: use parent's theme instead of calculating
-    
+    @Environment(\.colorScheme) var colorScheme
+
     // Configuration
     private let config = OnboardingTickConfig()
-    
+
     // Internal state
     @State private var tickIndex: Int = 0
     @State private var scrollPosition: Int?
@@ -31,27 +32,26 @@ struct OnboardingSlider: View {
     @State private var animationRange: ClosedRange<Int> = 0...0
     @State private var isInitialSetupDone: Bool = false
     @State private var previousTickIndex: Int = 0
-    
-    // Haptic feedback
 
+    // Haptic feedback
     private let feedbackGenerator = UIImpactFeedbackGenerator(style: .rigid)
-    
+
     // Computed properties
     private var tickCount: Int {
         maxValue / step
     }
-    
+
     private var tickWidth: CGFloat {
         config.tickWidth + (config.tickHPadding * 2)
     }
-    
+
     // Theme based on current value (or use override from parent)
     private var currentTheme: AppTheme {
         themeOverride ?? AppTheme.from(balance: Double(value))
     }
-    
+
     private var themeColors: ThemeColors {
-        currentTheme.colors
+        currentTheme.colors(for: colorScheme)
     }
     
     var body: some View {

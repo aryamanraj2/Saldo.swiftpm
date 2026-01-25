@@ -3,7 +3,8 @@ import SwiftUI
 // MARK: - Onboarding Manager
 /// Manages onboarding state and user's initial financial data
 @MainActor
-class OnboardingManager: ObservableObject {
+@Observable
+class OnboardingManager {
     static let shared = OnboardingManager()
 
     // Persistence keys
@@ -15,32 +16,32 @@ class OnboardingManager: ObservableObject {
         static let userBalance = "userBalance"
     }
 
-    // Published properties for SwiftUI observation
-    @Published var userName: String {
+    // Properties for SwiftUI observation (no @Published needed with @Observable)
+    var userName: String {
         didSet {
             UserDefaults.standard.set(userName, forKey: Keys.userName)
         }
     }
 
-    @Published var hasCompletedOnboarding: Bool {
+    var hasCompletedOnboarding: Bool {
         didSet {
             UserDefaults.standard.set(hasCompletedOnboarding, forKey: Keys.hasCompletedOnboarding)
         }
     }
     
-    @Published var userAllowance: Int {
+    var userAllowance: Int {
         didSet {
             UserDefaults.standard.set(userAllowance, forKey: Keys.userAllowance)
         }
     }
     
-    @Published var userSpending: Int {
+    var userSpending: Int {
         didSet {
             UserDefaults.standard.set(userSpending, forKey: Keys.userSpending)
         }
     }
     
-    @Published var userBalance: Int {
+    var userBalance: Int {
         didSet {
             UserDefaults.standard.set(userBalance, forKey: Keys.userBalance)
         }

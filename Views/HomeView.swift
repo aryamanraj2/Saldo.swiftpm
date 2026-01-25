@@ -3,6 +3,7 @@ import VisionKit
 
 struct HomeView: View {
     @State private var balance: Double = 4500.0
+    @Environment(\.colorScheme) var colorScheme
 
     // User name from onboarding
     @AppStorage("userName") private var userName: String = ""
@@ -15,17 +16,17 @@ struct HomeView: View {
     @State private var scanError: Error?
     @State private var showResultSheet = false
     @State private var showErrorAlert = false
-    
+
     // Sheet Detent State (Controlled by HomeView)
     @State private var sheetDetent: PresentationDetent = .scannerMedium
-    
+
     // Computed theme based on balance
     var theme: AppTheme {
         AppTheme.from(balance: balance)
     }
-    
+
     var colors: ThemeColors {
-        theme.colors
+        theme.colors(for: colorScheme)
     }
     
     var body: some View {
@@ -118,7 +119,7 @@ struct HomeView: View {
                         }
                         .padding(20)
                         .background(.ultraThinMaterial)
-                        .clipShape(RoundedRectangle(cornerRadius: 15))
+                        .clipShape(.rect(cornerRadius: 15))
                         .padding(.horizontal, 20)
                         .padding(.bottom, 100) // Fixed padding for native sheet
                     }
@@ -143,6 +144,7 @@ struct HomeView: View {
                                 .font(.title3)
                                 .foregroundStyle(colors.primary)
                         }
+                        .accessibilityLabel("Profile")
                     },
                     afterTrailing: { 
                         Button(action: {}) {
@@ -150,6 +152,7 @@ struct HomeView: View {
                                 .font(.title3)
                                 .foregroundStyle(colors.primary)
                         }
+                        .accessibilityLabel("Profile")
                     },
                     beforeCenter: { EmptyView() },
                     afterCenter: { 

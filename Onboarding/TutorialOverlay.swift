@@ -170,14 +170,17 @@ struct TutorialHighlightModifier: ViewModifier {
 // MARK: - Tutorial Overlay View
 fileprivate struct TutorialOverlayView: View {
     var snapshot: UIImage
-    
+
     @Environment(TutorialCoordinator.self) var coordinator
+    @Environment(\.colorScheme) var colorScheme
     @State private var animate: Bool = false
     @State private var currentIndex: Int = 0
     @State private var dismissOpacity: Double = 1.0
-    
-    // Use moderate theme colors
-    private let themeColors = AppTheme.moderate.colors
+
+    // Use moderate theme colors with colorScheme support
+    private var themeColors: ThemeColors {
+        AppTheme.moderate.colors(for: colorScheme)
+    }
     
     var body: some View {
         GeometryReader { geometry in
@@ -261,9 +264,12 @@ fileprivate struct TutorialOverlayView: View {
             dismissOpacity = 0
         }
         
-        // Mark as finished
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-            coordinator.isTutorialFinished = true
+        // Mark as finished after animation completes
+        Task {
+            try? await Task.sleep(for: .seconds(0.4))
+            await MainActor.run {
+                coordinator.isTutorialFinished = true
+            }
         }
     }
 }
@@ -435,25 +441,25 @@ extension View {
                         .font(.largeTitle)
                         .padding()
                         .background(Color.gray.opacity(0.2))
-                        .cornerRadius(12)
+                        .clipShape(.rect(cornerRadius: 12))
                         .tutorialHighlight(.remainingBalance)
                     
                     Button("Get Insights") {}
                         .padding()
                         .background(Color.blue.opacity(0.2))
-                        .cornerRadius(12)
+                        .clipShape(.rect(cornerRadius: 12))
                         .tutorialHighlight(.getInsights)
                     
                     Button("Scan Receipt") {}
                         .padding()
                         .background(Color.green.opacity(0.2))
-                        .cornerRadius(12)
+                        .clipShape(.rect(cornerRadius: 12))
                         .tutorialHighlight(.scanReceipt)
                     
                     Text("Grills Section")
                         .padding()
                         .background(Color.orange.opacity(0.2))
-                        .cornerRadius(12)
+                        .clipShape(.rect(cornerRadius: 12))
                         .tutorialHighlight(.grills)
                 }
             }

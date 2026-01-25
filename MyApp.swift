@@ -13,11 +13,10 @@ struct MyApp: App {
                     .tutorialOverlay(isActive: $showTutorial) {
                         hasCompletedTutorial = true
                     }
-                    .onAppear {
+                    .task {
                         if !hasCompletedTutorial {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                                showTutorial = true
-                            }
+                            try? await Task.sleep(for: .seconds(0.2))
+                            showTutorial = true
                         }
                     }
             } else {
