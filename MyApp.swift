@@ -8,20 +8,23 @@ struct MyApp: App {
     
     var body: some Scene {
         WindowGroup {
-            if hasCompletedOnboarding {
-                HomeView()
-                    .tutorialOverlay(isActive: $showTutorial) {
-                        hasCompletedTutorial = true
-                    }
-                    .task {
-                        if !hasCompletedTutorial {
-                            try? await Task.sleep(for: .seconds(0.2))
-                            showTutorial = true
+            Group {
+                if hasCompletedOnboarding {
+                    HomeView()
+                        .tutorialOverlay(isActive: $showTutorial) {
+                            hasCompletedTutorial = true
                         }
-                    }
-            } else {
-                OnboardingView(isOnboardingComplete: $hasCompletedOnboarding)
+                        .task {
+                            if !hasCompletedTutorial {
+                                try? await Task.sleep(for: .seconds(0.2))
+                                showTutorial = true
+                            }
+                        }
+                } else {
+                    OnboardingView(isOnboardingComplete: $hasCompletedOnboarding)
+                }
             }
+            .preferredColorScheme(.light) // Force light mode, ignore system dark mode
         }
     }
 }
