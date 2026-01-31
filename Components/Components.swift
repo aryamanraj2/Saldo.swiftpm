@@ -385,7 +385,7 @@ struct GlassPeriodSelector: View {
                     }
                 }
             }
-            .gesture(
+            .simultaneousGesture(
                 DragGesture(minimumDistance: 5)
                     .onChanged { value in
                         let index = Int((value.location.x / segmentWidth).rounded(.down))
