@@ -112,7 +112,7 @@ struct BalanceCard: View {
                 .fontWeight(.medium)
                 .foregroundStyle(Color.saldoSecondary)
             
-            (Text("₹") + Text(balance, format: .number.precision(.fractionLength(2))))
+            Text("₹\(balance, format: .number.precision(.fractionLength(2)))")
                 .contentTransition(.numericText()) // Smooth number transition
                 .font(.system(size: 48, weight: .bold, design: .rounded))
                 .foregroundStyle(colors.primary)
@@ -344,61 +344,101 @@ struct SpendLinePath: Shape {
     }
 }
 
+// MARK: - Glass Period Selector (iOS 26+ Optimized)
+struct GlassPeriodSelector: View {
+    @Binding var selectedPeriod: SpendPeriod
+    var colors: ThemeColors
+    var onPeriodChange: () -> Void
+    
+    private let periods = SpendPeriod.allCases
+    
+    var body: some View {
+        GeometryReader { geometry in
+            let segmentWidth = geometry.size.width / CGFloat(periods.count)
+            let selectedIndex = periods.firstIndex(of: selectedPeriod) ?? 0
+
+            ZStack(alignment: .leading) {
+                // Selection indicator background
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .shadow(color: Color.black.opacity(0.12), radius: 6, x: 0, y: 2)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(.white.opacity(0.5), lineWidth: 0.5)
+                    )
+                    .frame(width: segmentWidth, height: 34)
+                    .offset(x: CGFloat(selectedIndex) * segmentWidth)
+                
+                // Period labels
+                HStack(spacing: 0) {
+                    ForEach(periods, id: \.self) { period in
+                        Text(period.rawValue)
+                            .font(.subheadline)
+                            .fontWeight(selectedPeriod == period ? .bold : .medium)
+                            .foregroundStyle(selectedPeriod == period ? colors.primary : Color.saldoSecondary)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 38)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                selectPeriod(period)
+                            }
+                    }
+                }
+            }
+            .gesture(
+                DragGesture(minimumDistance: 5)
+                    .onChanged { value in
+                        let index = Int((value.location.x / segmentWidth).rounded(.down))
+                        let clampedIndex = max(0, min(periods.count - 1, index))
+                        let newPeriod = periods[clampedIndex]
+                        if newPeriod != selectedPeriod {
+                            selectPeriod(newPeriod)
+                        }
+                    }
+            )
+        }
+        .frame(height: 42)
+        .padding(4)
+        .background(
+            Color.saldoSecondary.opacity(0.06)
+                .background(.ultraThinMaterial)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
+        )
+    }
+    
+    private func selectPeriod(_ period: SpendPeriod) {
+        // Use smooth animation for the selection indicator
+        withAnimation(.smooth(duration: 0.25)) {
+            selectedPeriod = period
+        }
+        // Trigger line graph re-draw callback
+        onPeriodChange()
+    }
+}
+
 // MARK: - Weekly Spend Card
 struct WeeklySpendCard: View {
     var colors: ThemeColors
     @State private var selectedPeriod: SpendPeriod = .week
     @State private var animationProgress: CGFloat = 1.0
-    @Namespace private var animation
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Liquid Glass Switcher
-            HStack(spacing: 0) {
-                ForEach(SpendPeriod.allCases, id: \.self) { period in
-                    Button(action: {
-                        // Reset and animate the line drawing
-                        animationProgress = 0
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
-                            selectedPeriod = period
-                        }
-                        withAnimation(.easeOut(duration: 0.6).delay(0.1)) {
-                            animationProgress = 1.0
-                        }
-                    }) {
-                        ZStack {
-                            if selectedPeriod == period {
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .fill(.ultraThinMaterial)
-                                    .shadow(color: Color.black.opacity(0.12), radius: 4, x: 0, y: 2)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                            .stroke(.white.opacity(0.4), lineWidth: 0.5)
-                                    )
-                                    .matchedGeometryEffect(id: "ACTIVETAB", in: animation)
-                            }
-                            
-                            Text(period.rawValue)
-                                .font(.subheadline)
-                                .fontWeight(selectedPeriod == period ? .bold : .medium)
-                                .foregroundStyle(selectedPeriod == period ? colors.primary : Color.saldoSecondary)
-                        }
-                        .frame(height: 38)
-                        .frame(maxWidth: .infinity)
-                        .contentShape(Rectangle())
+            // Smooth Liquid Glass Period Selector
+            GlassPeriodSelector(
+                selectedPeriod: $selectedPeriod,
+                colors: colors,
+                onPeriodChange: {
+                    // Animate line graph separately with a slight delay
+                    animationProgress = 0
+                    withAnimation(.easeOut(duration: 0.5).delay(0.05)) {
+                        animationProgress = 1.0
                     }
-                    .buttonStyle(.plain)
                 }
-            }
-            .padding(4)
-            .background(
-                Color.saldoSecondary.opacity(0.06)
-                    .background(.ultraThinMaterial)
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay(
-                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                     .stroke(Color.white.opacity(0.2), lineWidth: 0.5)
             )
             
             Text(selectedPeriod.title)
@@ -556,3 +596,4 @@ struct TransactionRow: View {
         .liquidGlass(cornerRadius: 20, material: .regular, shadowColor: colors.accent)
     }
 }
+
