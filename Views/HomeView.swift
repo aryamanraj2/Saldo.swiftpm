@@ -16,9 +16,15 @@ struct HomeView: View {
     @State private var scanError: Error?
     @State private var showResultSheet = false
     @State private var showErrorAlert = false
+    
+    // Subscription Sheet State
+    @State private var showSubscriptionSheet = false
 
     // Sheet Detent State (Controlled by HomeView)
     @State private var sheetDetent: PresentationDetent = .scannerMedium
+    
+    // Scanner Sheet Visibility (must be dismissed when subscription opens)
+    @State private var showScannerSheet = true
 
     // Computed theme based on balance
     var theme: AppTheme {
@@ -75,7 +81,13 @@ struct HomeView: View {
                                     title: "Add",
                                     subtitle: "Subscription",
                                     colors: colors,
-                                    action: {}
+                                    action: {
+                                        // Dismiss scanner sheet first, then show subscription
+                                        showScannerSheet = false
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                            showSubscriptionSheet = true
+                                        }
+                                    }
                                 )
                                 
                                 WideActionButton(
@@ -190,7 +202,8 @@ struct HomeView: View {
             ScannerSheetContainer(
                 colors: colors,
                 showCamera: $showCamera,
-                selectedDetent: $sheetDetent
+                selectedDetent: $sheetDetent,
+                showSheet: $showScannerSheet
             )
         }
         // Scan Result Sheet
@@ -209,6 +222,13 @@ struct HomeView: View {
             }
         } message: {
             Text(scanError?.localizedDescription ?? "Unknown error occurred")
+        }
+        // Subscription Sheet
+        .sheet(isPresented: $showSubscriptionSheet, onDismiss: {
+            // Restore scanner sheet when subscription closes
+            showScannerSheet = true
+        }) {
+            SubscriptionSheet(colors: colors)
         }
         // Processing Overlay
         .overlay {

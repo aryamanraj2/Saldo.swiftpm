@@ -26,7 +26,8 @@ struct ScannerSheetContainer: View {
     // Binding to control detent from parent (e.g. collapse on scroll)
     @Binding var selectedDetent: PresentationDetent
     
-    @State private var showSheet: Bool = true
+    // Binding to control sheet visibility from parent
+    @Binding var showSheet: Bool
     @State private var sheetHeight: CGFloat = 0
     
     // Check if document scanning is supported
@@ -508,7 +509,8 @@ class CameraPreviewUIView: UIView {
         ScannerSheetContainer(
             colors: AppTheme.wealthy.colors,
             showCamera: .constant(false),
-            selectedDetent: .constant(.scannerMedium)
+            selectedDetent: .constant(.scannerMedium),
+            showSheet: .constant(true)
         )
     }
 }
