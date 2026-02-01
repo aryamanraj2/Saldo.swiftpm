@@ -82,9 +82,11 @@ struct HomeView: View {
                                     subtitle: "Subscription",
                                     colors: colors,
                                     action: {
-                                        // Dismiss scanner sheet first, then show subscription
-                                        showScannerSheet = false
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                        // Dismiss scanner sheet with animation, then show subscription
+                                        withAnimation(.easeOut(duration: 0.25)) {
+                                            showScannerSheet = false
+                                        }
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                                             showSubscriptionSheet = true
                                         }
                                     }
@@ -225,8 +227,12 @@ struct HomeView: View {
         }
         // Subscription Sheet
         .sheet(isPresented: $showSubscriptionSheet, onDismiss: {
-            // Restore scanner sheet when subscription closes
-            showScannerSheet = true
+            // Restore scanner sheet smoothly when subscription closes
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                withAnimation(.easeOut(duration: 0.3)) {
+                    showScannerSheet = true
+                }
+            }
         }) {
             SubscriptionSheet(colors: colors)
         }
