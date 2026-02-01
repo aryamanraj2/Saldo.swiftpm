@@ -30,6 +30,9 @@ struct ScannerSheetContainer: View {
     @Binding var showSheet: Bool
     @State private var sheetHeight: CGFloat = 0
     
+    // Callback for adding subscription from the expanded sheet
+    var onAddSubscription: (() -> Void)? = nil
+    
     // Check if document scanning is supported
     private var isDocumentScanningSupported: Bool {
         VNDocumentCameraViewController.isSupported
@@ -52,7 +55,8 @@ struct ScannerSheetContainer: View {
                             } else {
                                 print("[Scanner] Document scanning not supported on this device")
                             }
-                        }
+                        },
+                        onAddSubscription: onAddSubscription
                     )
                     // Read the Sheet's Geometry
                     .overlay {
@@ -103,6 +107,7 @@ struct ScannerSheetContent: View {
     var colors: ThemeColors
     @Binding var selectedDetent: PresentationDetent
     var onScanTap: () -> Void
+    var onAddSubscription: (() -> Void)? = nil
     
     var body: some View {
         VStack(spacing: 0) {
@@ -115,7 +120,7 @@ struct ScannerSheetContent: View {
             
             // MARK: - Expanded Content (Only in Medium Detent)
             if selectedDetent != .scannerSmall {
-                ExpandedSheetContent(colors: colors)
+                ExpandedSheetContent(colors: colors, onAddSubscription: onAddSubscription)
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
         }
@@ -175,34 +180,35 @@ struct FloatingScanBar: View {
 // MARK: - Expanded Sheet Content (Below the Search Bar)
 struct ExpandedSheetContent: View {
     var colors: ThemeColors
+    var onAddSubscription: (() -> Void)? = nil
     
     var body: some View {
         VStack(spacing: 0) {
-            // Grills Section Header
+            // Subscription Section Header
             HStack {
-                Text("Grills")
+                Text("Subscription")
                     .font(.headline)
                     .fontWeight(.bold)
                     .foregroundStyle(Color.saldoPrimary)
                 
                 Spacer()
                 
-                // Coming Soon badge
-                Text("Coming Soon")
-                    .font(.caption2)
-                    .fontWeight(.medium)
-                    .foregroundStyle(colors.accent)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(colors.accent.opacity(0.1))
-                    .clipShape(Capsule())
+                // Plus button to add subscription
+                Button(action: {
+                    onAddSubscription?()
+                }) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 24))
+                        .foregroundStyle(colors.accent)
+                }
+                .buttonStyle(.plain)
             }
             .padding(.horizontal, 20)
             .padding(.top, 8)
             .padding(.bottom, 12)
             
-            // Grills Placeholder Grid
-            GrillsPlaceholder(colors: colors)
+            // Subscription Placeholder Grid
+            SubscriptionPlaceholder(colors: colors)
                 .padding(.horizontal, 16)
                 .tutorialHighlight(.grills)
             
@@ -211,8 +217,8 @@ struct ExpandedSheetContent: View {
     }
 }
 
-// MARK: - Grills Placeholder
-struct GrillsPlaceholder: View {
+// MARK: - Subscription Placeholder
+struct SubscriptionPlaceholder: View {
     var colors: ThemeColors
     
     var body: some View {
@@ -226,7 +232,7 @@ struct GrillsPlaceholder: View {
                     .fill(Color.saldoSecondary.opacity(0.06))
                     .frame(height: 60)
                     .overlay(
-                        Image(systemName: "plus")
+                        Image(systemName: "creditcard")
                             .font(.system(size: 16, weight: .medium))
                             .foregroundStyle(Color.saldoSecondary.opacity(0.25))
                     )

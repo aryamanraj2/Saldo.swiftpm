@@ -79,7 +79,7 @@ struct HomeView: View {
                                 ActionButton(
                                     icon: "plus.circle.fill",
                                     title: "Add",
-                                    subtitle: "Subscription",
+                                    subtitle: "Grails",
                                     colors: colors,
                                     action: {
                                         // Dismiss scanner sheet with animation, then show subscription
@@ -205,7 +205,16 @@ struct HomeView: View {
                 colors: colors,
                 showCamera: $showCamera,
                 selectedDetent: $sheetDetent,
-                showSheet: $showScannerSheet
+                showSheet: $showScannerSheet,
+                onAddSubscription: {
+                    // Dismiss scanner sheet with animation, then show subscription
+                    withAnimation(.easeOut(duration: 0.25)) {
+                        showScannerSheet = false
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        showSubscriptionSheet = true
+                    }
+                }
             )
         }
         // Scan Result Sheet

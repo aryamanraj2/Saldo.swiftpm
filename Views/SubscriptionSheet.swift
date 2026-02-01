@@ -27,12 +27,12 @@ struct SubscriptionSheet: View {
                             .font(.system(size: 48))
                             .foregroundStyle(colors.accent)
                         
-                        Text("Add Subscription")
+                        Text("Add Grails")
                             .font(.title2)
                             .fontWeight(.bold)
                             .foregroundStyle(Color.saldoPrimary)
                         
-                        Text("Track your recurring expenses")
+                        Text("Set your spending goals")
                             .font(.subheadline)
                             .foregroundStyle(Color.saldoSecondary)
                     }
@@ -104,7 +104,7 @@ struct SubscriptionSheetHeader: View {
                             .foregroundStyle(colors.accent)
                     }
                     
-                    Text("New Subscription")
+                    Text("New Grail")
                         .font(.body)
                         .fontWeight(.semibold)
                         .foregroundStyle(Color.saldoPrimary)
@@ -128,7 +128,7 @@ struct SubscriptionSheetHeader: View {
                             .foregroundStyle(colors.accent)
                     }
                     
-                    Text("New Subscription")
+                    Text("New Grail")
                         .font(.body)
                         .fontWeight(.semibold)
                         .foregroundStyle(Color.saldoPrimary)
