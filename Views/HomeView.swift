@@ -17,8 +17,9 @@ struct HomeView: View {
     @State private var showResultSheet = false
     @State private var showErrorAlert = false
     
-    // Subscription Sheet State
-    @State private var showSubscriptionSheet = false
+    // Sheet States (Separate for Grails and Subscriptions)
+    @State private var showGrailsSheet = false
+    @State private var showAddSubscriptionSheet = false
 
     // Sheet Detent State (Controlled by HomeView)
     @State private var sheetDetent: PresentationDetent = .scannerMedium
@@ -82,12 +83,12 @@ struct HomeView: View {
                                     subtitle: "Grails",
                                     colors: colors,
                                     action: {
-                                        // Dismiss scanner sheet with animation, then show subscription
+                                        // Dismiss scanner sheet with animation, then show grails sheet
                                         withAnimation(.easeOut(duration: 0.25)) {
                                             showScannerSheet = false
                                         }
                                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                                            showSubscriptionSheet = true
+                                            showGrailsSheet = true
                                         }
                                     }
                                 )
@@ -207,12 +208,12 @@ struct HomeView: View {
                 selectedDetent: $sheetDetent,
                 showSheet: $showScannerSheet,
                 onAddSubscription: {
-                    // Dismiss scanner sheet with animation, then show subscription
+                    // Dismiss scanner sheet with animation, then show add subscription sheet
                     withAnimation(.easeOut(duration: 0.25)) {
                         showScannerSheet = false
                     }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                        showSubscriptionSheet = true
+                        showAddSubscriptionSheet = true
                     }
                 }
             )
@@ -234,9 +235,9 @@ struct HomeView: View {
         } message: {
             Text(scanError?.localizedDescription ?? "Unknown error occurred")
         }
-        // Subscription Sheet
-        .sheet(isPresented: $showSubscriptionSheet, onDismiss: {
-            // Restore scanner sheet smoothly when subscription closes
+        // Grails Sheet (for Add Grails button)
+        .sheet(isPresented: $showGrailsSheet, onDismiss: {
+            // Restore scanner sheet smoothly when grails sheet closes
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 withAnimation(.easeOut(duration: 0.3)) {
                     showScannerSheet = true
@@ -244,6 +245,17 @@ struct HomeView: View {
             }
         }) {
             SubscriptionSheet(colors: colors)
+        }
+        // Add Subscription Sheet (for subscription plus button in scanner sheet)
+        .sheet(isPresented: $showAddSubscriptionSheet, onDismiss: {
+            // Restore scanner sheet smoothly when add subscription sheet closes
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                withAnimation(.easeOut(duration: 0.3)) {
+                    showScannerSheet = true
+                }
+            }
+        }) {
+            AddSubscriptionSheet(colors: colors)
         }
         // Processing Overlay
         .overlay {
