@@ -20,6 +20,9 @@ struct HomeView: View {
     // Sheet States (Separate for Grails and Subscriptions)
     @State private var showGrailsSheet = false
     @State private var showAddSubscriptionSheet = false
+    
+    // Subscription Data
+    @State private var subscriptions: [SubscriptionItem] = []
 
     // Sheet Detent State (Controlled by HomeView)
     @State private var sheetDetent: PresentationDetent = .scannerMedium
@@ -207,6 +210,7 @@ struct HomeView: View {
                 showCamera: $showCamera,
                 selectedDetent: $sheetDetent,
                 showSheet: $showScannerSheet,
+                subscriptions: subscriptions,
                 onAddSubscription: {
                     // Dismiss scanner sheet with animation, then show add subscription sheet
                     withAnimation(.easeOut(duration: 0.25)) {
@@ -255,7 +259,9 @@ struct HomeView: View {
                 }
             }
         }) {
-            AddSubscriptionSheet(colors: colors)
+            AddSubscriptionSheet(colors: colors) { newSubscription in
+                subscriptions.append(newSubscription)
+            }
         }
         // Processing Overlay
         .overlay {

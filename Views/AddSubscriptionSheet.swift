@@ -1,9 +1,25 @@
 import SwiftUI
 
-// MARK: - Add Subscription Sheet (Same design as Grails Sheet)
+// MARK: - Add Subscription Sheet (Interactive Design)
 struct AddSubscriptionSheet: View {
     @Environment(\.dismiss) private var dismiss
     var colors: ThemeColors
+    
+    // Binding to save the subscription
+    var onSave: ((SubscriptionItem) -> Void)? = nil
+    
+    // Form State
+    @State private var subscriptionName: String = ""
+    @State private var amount: String = ""
+    @State private var selectedCurrency: CurrencyOption = CurrencyOption.options[0]
+    @State private var selectedCategory: SubscriptionCategory = .music
+    
+    @FocusState private var isNameFocused: Bool
+    @FocusState private var isAmountFocused: Bool
+    
+    var canSave: Bool {
+        !subscriptionName.isEmpty && !amount.isEmpty && Double(amount) != nil
+    }
     
     var body: some View {
         VStack(spacing: 0) {
@@ -15,43 +31,249 @@ struct AddSubscriptionSheet: View {
             
             // MARK: - Main Content Area
             ScrollView {
-                VStack(spacing: 20) {
-                    // Subscription content
-                    VStack(spacing: 12) {
-                        Image(systemName: "creditcard.and.123")
-                            .font(.system(size: 48))
-                            .foregroundStyle(colors.accent)
-                        
-                        Text("Add Subscription")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                            .foregroundStyle(Color.saldoPrimary)
-                        
-                        Text("Track your recurring payments")
-                            .font(.subheadline)
-                            .foregroundStyle(Color.saldoSecondary)
-                    }
-                    .padding(.top, 40)
+                VStack(spacing: 28) {
+                    // Icon Preview
+                    SubscriptionIconPreview(
+                        category: selectedCategory,
+                        name: subscriptionName,
+                        colors: colors
+                    )
+                    .padding(.top, 20)
                     
-                    // Coming Soon Badge
-                    Text("Coming Soon")
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundStyle(colors.accent)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(colors.accent.opacity(0.12))
-                        .clipShape(Capsule())
+                    // Category Picker (Pill-shaped chips)
+                    CategoryPicker(
+                        selectedCategory: $selectedCategory,
+                        colors: colors
+                    )
+                    
+                    // Form Fields
+                    VStack(spacing: 20) {
+                        // Name Input
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("What is it?")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(Color.saldoPrimary)
+                            
+                            TextField("e.g., Spotify", text: $subscriptionName)
+                                .font(.body)
+                                .foregroundStyle(Color.saldoPrimary)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 14)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .fill(Color.saldoSecondary.opacity(0.06))
+                                        .overlay(
+                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                .strokeBorder(
+                                                    isNameFocused ? colors.accent.opacity(0.4) : Color.clear,
+                                                    lineWidth: 1.5
+                                                )
+                                        )
+                                )
+                                .focused($isNameFocused)
+                        }
+                        
+                        // Amount & Currency
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("How much?")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(Color.saldoPrimary)
+                            
+                            HStack(spacing: 12) {
+                                // Currency Selector
+                                Menu {
+                                    ForEach(CurrencyOption.options) { option in
+                                        Button(action: {
+                                            selectedCurrency = option
+                                        }) {
+                                            HStack {
+                                                Text("\(option.symbol) \(option.code)")
+                                                if selectedCurrency == option {
+                                                    Image(systemName: "checkmark")
+                                                }
+                                            }
+                                        }
+                                    }
+                                } label: {
+                                    HStack(spacing: 6) {
+                                        Text(selectedCurrency.symbol)
+                                            .font(.title3)
+                                            .fontWeight(.semibold)
+                                        Image(systemName: "chevron.down")
+                                            .font(.caption)
+                                    }
+                                    .foregroundStyle(colors.accent)
+                                    .padding(.horizontal, 14)
+                                    .padding(.vertical, 14)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                            .fill(colors.accent.opacity(0.12))
+                                    )
+                                }
+                                
+                                // Amount Input
+                                TextField("0.00", text: $amount)
+                                    .font(.title3)
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(Color.saldoPrimary)
+                                    .keyboardType(.decimalPad)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 14)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                            .fill(Color.saldoSecondary.opacity(0.06))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                    .strokeBorder(
+                                                        isAmountFocused ? colors.accent.opacity(0.4) : Color.clear,
+                                                        lineWidth: 1.5
+                                                    )
+                                            )
+                                    )
+                                    .focused($isAmountFocused)
+                                    .frame(maxWidth: .infinity)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    
+                    // Save Button
+                    Button(action: {
+                        guard let amountValue = Double(amount) else { return }
+                        let subscription = SubscriptionItem(
+                            name: subscriptionName,
+                            amount: amountValue,
+                            currency: selectedCurrency.symbol,
+                            category: selectedCategory
+                        )
+                        onSave?(subscription)
+                        dismiss()
+                    }) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 18, weight: .semibold))
+                            Text("Save Subscription")
+                                .font(.body)
+                                .fontWeight(.semibold)
+                        }
+                        .foregroundStyle(canSave ? Color.white : Color.saldoSecondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(canSave ? colors.accent : Color.saldoSecondary.opacity(0.2))
+                        )
+                    }
+                    .disabled(!canSave)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 20)
                 }
-                .frame(maxWidth: .infinity)
             }
-            
-            Spacer()
+            .scrollDismissesKeyboard(.interactively)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .presentationDetents([.subscriptionLarge])
+        .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .modifier(AddSubscriptionSheetEnhancements(cornerRadius: 32))
+    }
+}
+
+// MARK: - Subscription Icon Preview
+struct SubscriptionIconPreview: View {
+    var category: SubscriptionCategory
+    var name: String
+    var colors: ThemeColors
+    
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(colors.accent.opacity(0.12))
+                .frame(width: 100, height: 100)
+            
+            if category == .misc && !name.isEmpty {
+                // Show first letter for misc
+                Text(String(name.prefix(1).uppercased()))
+                    .font(.system(size: 36, weight: .bold))
+                    .foregroundStyle(colors.accent)
+            } else {
+                // Show SF Symbol
+                Image(systemName: category.iconName)
+                    .font(.system(size: 40, weight: .semibold))
+                    .foregroundStyle(colors.accent)
+            }
+        }
+    }
+}
+
+// MARK: - Category Picker (Pill-shaped chips)
+struct CategoryPicker: View {
+    @Binding var selectedCategory: SubscriptionCategory
+    var colors: ThemeColors
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Category")
+                .font(.subheadline)
+                .fontWeight(.semibold)
+                .foregroundStyle(Color.saldoPrimary)
+                .padding(.horizontal, 20)
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(SubscriptionCategory.allCases) { category in
+                        CategoryChip(
+                            category: category,
+                            isSelected: selectedCategory == category,
+                            colors: colors,
+                            action: {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                    selectedCategory = category
+                                }
+                            }
+                        )
+                    }
+                }
+                .padding(.horizontal, 20)
+            }
+        }
+    }
+}
+
+// MARK: - Category Chip
+struct CategoryChip: View {
+    var category: SubscriptionCategory
+    var isSelected: Bool
+    var colors: ThemeColors
+    var action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: category.iconName)
+                    .font(.system(size: 16, weight: .semibold))
+                
+                Text(category.rawValue)
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+            }
+            .foregroundStyle(isSelected ? Color.white : colors.accent)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(
+                Capsule()
+                    .fill(isSelected ? colors.accent : colors.accent.opacity(0.12))
+            )
+            .overlay(
+                Capsule()
+                    .strokeBorder(
+                        isSelected ? Color.clear : colors.accent.opacity(0.3),
+                        lineWidth: 1
+                    )
+            )
+        }
+        .buttonStyle(.plain)
     }
 }
 

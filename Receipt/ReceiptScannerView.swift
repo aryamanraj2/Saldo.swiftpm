@@ -30,6 +30,9 @@ struct ScannerSheetContainer: View {
     @Binding var showSheet: Bool
     @State private var sheetHeight: CGFloat = 0
     
+    // Subscription data to display
+    var subscriptions: [SubscriptionItem] = []
+    
     // Callback for adding subscription from the expanded sheet
     var onAddSubscription: (() -> Void)? = nil
     
@@ -47,6 +50,7 @@ struct ScannerSheetContainer: View {
                     ScannerSheetContent(
                         colors: colors,
                         selectedDetent: $selectedDetent,
+                        subscriptions: subscriptions,
                         onScanTap: {
                             print("[Scanner] Scan button tapped")
                             if isDocumentScanningSupported {
@@ -106,6 +110,7 @@ private struct PresentationEnhancements: ViewModifier {
 struct ScannerSheetContent: View {
     var colors: ThemeColors
     @Binding var selectedDetent: PresentationDetent
+    var subscriptions: [SubscriptionItem] = []
     var onScanTap: () -> Void
     var onAddSubscription: (() -> Void)? = nil
     
@@ -120,7 +125,11 @@ struct ScannerSheetContent: View {
             
             // MARK: - Expanded Content (Only in Medium Detent)
             if selectedDetent != .scannerSmall {
-                ExpandedSheetContent(colors: colors, onAddSubscription: onAddSubscription)
+                ExpandedSheetContent(
+                    colors: colors,
+                    subscriptions: subscriptions,
+                    onAddSubscription: onAddSubscription
+                )
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
         }
@@ -180,6 +189,7 @@ struct FloatingScanBar: View {
 // MARK: - Expanded Sheet Content (Below the Search Bar)
 struct ExpandedSheetContent: View {
     var colors: ThemeColors
+    var subscriptions: [SubscriptionItem] = []
     var onAddSubscription: (() -> Void)? = nil
     
     var body: some View {
@@ -207,8 +217,8 @@ struct ExpandedSheetContent: View {
             .padding(.top, 8)
             .padding(.bottom, 12)
             
-            // Subscription Placeholder Grid
-            SubscriptionPlaceholder(colors: colors)
+            // Subscription Grid (shows actual subscriptions or placeholders)
+            SubscriptionGrid(subscriptions: subscriptions, colors: colors)
                 .padding(.horizontal, 16)
                 .tutorialHighlight(.grills)
             
@@ -217,7 +227,82 @@ struct ExpandedSheetContent: View {
     }
 }
 
-// MARK: - Subscription Placeholder
+// MARK: - Subscription Grid
+struct SubscriptionGrid: View {
+    var subscriptions: [SubscriptionItem]
+    var colors: ThemeColors
+    
+    var body: some View {
+        LazyVGrid(columns: [
+            GridItem(.flexible(), spacing: 12),
+            GridItem(.flexible(), spacing: 12),
+            GridItem(.flexible(), spacing: 12)
+        ], spacing: 12) {
+            if subscriptions.isEmpty {
+                // Show placeholders when empty
+                ForEach(0..<3, id: \.self) { index in
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.saldoSecondary.opacity(0.06))
+                        .frame(height: 60)
+                        .overlay(
+                            Image(systemName: "creditcard")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundStyle(Color.saldoSecondary.opacity(0.25))
+                        )
+                }
+            } else {
+                // Show actual subscriptions
+                ForEach(subscriptions) { subscription in
+                    SubscriptionGridItem(subscription: subscription, colors: colors)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Subscription Grid Item
+struct SubscriptionGridItem: View {
+    var subscription: SubscriptionItem
+    var colors: ThemeColors
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            // Icon
+            ZStack {
+                Circle()
+                    .fill(colors.accent.opacity(0.12))
+                    .frame(width: 36, height: 36)
+                
+                if subscription.usesLetterIcon {
+                    // Show first letter for misc category
+                    Text(subscription.iconName)
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(colors.accent)
+                } else {
+                    // Show SF Symbol
+                    Image(systemName: subscription.iconName)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(colors.accent)
+                }
+            }
+            
+            // Name
+            Text(subscription.name)
+                .font(.caption2)
+                .fontWeight(.medium)
+                .foregroundStyle(Color.saldoPrimary)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.saldoSecondary.opacity(0.06))
+        )
+    }
+}
+
+// MARK: - Subscription Placeholder (Legacy - keeping for backwards compatibility)
 struct SubscriptionPlaceholder: View {
     var colors: ThemeColors
     
