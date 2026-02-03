@@ -11,6 +11,7 @@ enum SheetGlassVariant {
 struct SheetGlassBackgroundModifier: ViewModifier {
     let cornerRadius: CGFloat
     let variant: SheetGlassVariant
+    let opacity: Double
 
     func body(content: Content) -> some View {
         if #available(iOS 26, *) {
@@ -21,17 +22,19 @@ struct SheetGlassBackgroundModifier: ViewModifier {
                     .background {
                         Color.clear
                             .glassEffect(.clear, in: .rect(cornerRadius: cornerRadius))
+                            .opacity(opacity)
                     }
             } else {
                 content
                     .background {
                         Color.clear
                             .glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
+                            .opacity(opacity)
                     }
             }
         } else {
             content
-                .background(.ultraThinMaterial)
+                .background(.ultraThinMaterial.opacity(opacity))
                 .clipShape(.rect(cornerRadius: cornerRadius))
         }
     }
@@ -40,8 +43,9 @@ struct SheetGlassBackgroundModifier: ViewModifier {
 extension View {
     func sheetGlassBackground(
         cornerRadius: CGFloat,
-        variant: SheetGlassVariant = .regular
+        variant: SheetGlassVariant = .regular,
+        opacity: Double = 1.0
     ) -> some View {
-        modifier(SheetGlassBackgroundModifier(cornerRadius: cornerRadius, variant: variant))
+        modifier(SheetGlassBackgroundModifier(cornerRadius: cornerRadius, variant: variant, opacity: opacity))
     }
 }

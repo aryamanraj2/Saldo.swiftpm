@@ -60,17 +60,29 @@ struct AddSubscriptionSheet: View {
                                 .foregroundStyle(Color.saldoPrimary)
                                 .padding(.horizontal, 16)
                                 .padding(.vertical, 14)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                        .fill(Color.saldoSecondary.opacity(0.06))
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                                .strokeBorder(
-                                                    isNameFocused ? colors.accent.opacity(0.4) : Color.clear,
-                                                    lineWidth: 1.5
-                                                )
-                                        )
-                                )
+                                .background {
+                                    if #available(iOS 26, *) {
+                                        Color.clear
+                                            .glassEffect(.regular, in: .rect(cornerRadius: 12))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                    .strokeBorder(
+                                                        isNameFocused ? colors.accent.opacity(0.4) : Color.clear,
+                                                        lineWidth: 1.5
+                                                    )
+                                            )
+                                    } else {
+                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                            .fill(Color.saldoSecondary.opacity(0.06))
+                                            .overlay(
+                                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                    .strokeBorder(
+                                                        isNameFocused ? colors.accent.opacity(0.4) : Color.clear,
+                                                        lineWidth: 1.5
+                                                    )
+                                            )
+                                    }
+                                }
                                 .focused($isNameFocused)
                         }
                         
@@ -107,10 +119,15 @@ struct AddSubscriptionSheet: View {
                                     .foregroundStyle(colors.accent)
                                     .padding(.horizontal, 14)
                                     .padding(.vertical, 14)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                            .fill(colors.accent.opacity(0.12))
-                                    )
+                                    .background {
+                                        if #available(iOS 26, *) {
+                                            Color.clear
+                                                .glassEffect(.regular, in: .rect(cornerRadius: 12))
+                                        } else {
+                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                .fill(colors.accent.opacity(0.12))
+                                        }
+                                    }
                                 }
                                 
                                 // Amount Input
@@ -121,17 +138,29 @@ struct AddSubscriptionSheet: View {
                                     .keyboardType(.decimalPad)
                                     .padding(.horizontal, 16)
                                     .padding(.vertical, 14)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                            .fill(Color.saldoSecondary.opacity(0.06))
-                                            .overlay(
-                                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                                    .strokeBorder(
-                                                        isAmountFocused ? colors.accent.opacity(0.4) : Color.clear,
-                                                        lineWidth: 1.5
-                                                    )
-                                            )
-                                    )
+                                    .background {
+                                        if #available(iOS 26, *) {
+                                            Color.clear
+                                                .glassEffect(.regular, in: .rect(cornerRadius: 12))
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                        .strokeBorder(
+                                                            isAmountFocused ? colors.accent.opacity(0.4) : Color.clear,
+                                                            lineWidth: 1.5
+                                                        )
+                                                )
+                                        } else {
+                                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                .fill(Color.saldoSecondary.opacity(0.06))
+                                                .overlay(
+                                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                                        .strokeBorder(
+                                                            isAmountFocused ? colors.accent.opacity(0.4) : Color.clear,
+                                                            lineWidth: 1.5
+                                                        )
+                                                )
+                                        }
+                                    }
                                     .focused($isAmountFocused)
                                     .frame(maxWidth: .infinity)
                             }
@@ -174,8 +203,24 @@ struct AddSubscriptionSheet: View {
             .scrollDismissesKeyboard(.interactively)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .sheetGlassBackground(cornerRadius: 32)
-        .presentationDetents([.large])
+        .background {
+            // Draw an explicit glass "surface" so the translucency reads clearly even with sparse content.
+            if #available(iOS 26, *) {
+                RoundedRectangle(cornerRadius: 32, style: .continuous)
+                    .fill(.clear)
+                    .glassEffect(.clear, in: .rect(cornerRadius: 32))
+                    .opacity(0.78)
+            } else {
+                RoundedRectangle(cornerRadius: 32, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .opacity(0.62)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 32, style: .continuous)
+                            .strokeBorder(.white.opacity(0.22), lineWidth: 0.5)
+                    }
+            }
+        }
+        .presentationDetents([.fraction(0.85)])
         .presentationDragIndicator(.visible)
         .modifier(AddSubscriptionSheetEnhancements(cornerRadius: 32))
     }
