@@ -174,6 +174,7 @@ struct AddSubscriptionSheet: View {
             .scrollDismissesKeyboard(.interactively)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .sheetGlassBackground(cornerRadius: 32)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .modifier(AddSubscriptionSheetEnhancements(cornerRadius: 32))

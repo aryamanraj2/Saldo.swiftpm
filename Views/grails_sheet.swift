@@ -54,6 +54,23 @@ struct SubscriptionSheet: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background {
+            // Draw an explicit glass "surface" so the translucency reads clearly even with sparse content.
+            if #available(iOS 26, *) {
+                RoundedRectangle(cornerRadius: 32, style: .continuous)
+                    .fill(.clear)
+                    .glassEffect(.clear, in: .rect(cornerRadius: 32))
+                    .opacity(0.78)
+            } else {
+                RoundedRectangle(cornerRadius: 32, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .opacity(0.62)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 32, style: .continuous)
+                            .strokeBorder(.white.opacity(0.22), lineWidth: 0.5)
+                    }
+            }
+        }
         .presentationDetents([.subscriptionLarge])
         .presentationDragIndicator(.visible)
         .modifier(SubscriptionSheetEnhancements(cornerRadius: 32))
