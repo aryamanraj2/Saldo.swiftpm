@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - Add Subscription Sheet (Interactive Design)
 struct AddSubscriptionSheet: View {
@@ -238,18 +239,25 @@ struct SubscriptionIconPreview: View {
                 .fill(colors.accent.opacity(0.12))
                 .frame(width: 100, height: 100)
             
-            if category == .misc && !name.isEmpty {
-                // Show first letter for misc
-                Text(String(name.prefix(1).uppercased()))
-                    .font(.system(size: 36, weight: .bold))
-                    .foregroundStyle(colors.accent)
-            } else {
-                // Show SF Symbol
-                Image(systemName: category.iconName)
-                    .font(.system(size: 40, weight: .semibold))
-                    .foregroundStyle(colors.accent)
+            Group {
+                if category == .misc && !name.isEmpty {
+                    // Show first letter for misc
+                    Text(String(name.prefix(1).uppercased()))
+                        .font(.system(size: 36, weight: .bold))
+                        .id("text-\(name.prefix(1))")
+                } else {
+                    // Show SF Symbol
+                    Image(systemName: category.iconName)
+                        .font(.system(size: 40, weight: .semibold))
+                        .contentTransition(.symbolEffect(.replace))
+                        .id(category.iconName)
+                }
             }
+            .foregroundStyle(colors.accent)
+            .transition(.scale(scale: 0.8).combined(with: .opacity))
         }
+        .animation(.spring(response: 0.35, dampingFraction: 0.7), value: category)
+        .animation(.spring(response: 0.35, dampingFraction: 0.7), value: name)
     }
 }
 
@@ -294,11 +302,25 @@ struct CategoryChip: View {
     var colors: ThemeColors
     var action: () -> Void
     
+    @State private var burstTrigger = 0
+    
     var body: some View {
-        Button(action: action) {
+        Button(action: {
+            // Haptic Feedback (UIKit)
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.prepare()
+            generator.impactOccurred()
+            
+            // Trigger Burst
+            burstTrigger += 1
+            
+            // Trigger Selection
+            action()
+        }) {
             HStack(spacing: 8) {
                 Image(systemName: category.iconName)
                     .font(.system(size: 16, weight: .semibold))
+                    .symbolVariant(isSelected ? .fill : .none)
                 
                 Text(category.rawValue)
                     .font(.subheadline)
@@ -308,8 +330,16 @@ struct CategoryChip: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
             .background(
-                Capsule()
-                    .fill(isSelected ? colors.accent : colors.accent.opacity(0.12))
+                ZStack {
+                    Capsule()
+                        .fill(isSelected ? colors.accent : colors.accent.opacity(0.12))
+                    
+                    // Burst Effect
+                    BurstEffectView(
+                        trigger: burstTrigger,
+                        color: UIColor(colors.accent)
+                    )
+                }
             )
             .overlay(
                 Capsule()
@@ -320,6 +350,79 @@ struct CategoryChip: View {
             )
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - UIKit Burst Effect
+struct BurstEffectView: UIViewRepresentable {
+    var trigger: Int
+    var color: UIColor
+    
+    func makeUIView(context: Context) -> BurstUIView {
+        let view = BurstUIView()
+        view.isUserInteractionEnabled = false
+        view.backgroundColor = .clear
+        return view
+    }
+    
+    func updateUIView(_ uiView: BurstUIView, context: Context) {
+        if context.coordinator.lastTrigger != trigger {
+            context.coordinator.lastTrigger = trigger
+            if trigger > 0 {
+                uiView.performBurst(color: color)
+            }
+        }
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+    
+    class Coordinator {
+        var lastTrigger = 0
+    }
+}
+
+class BurstUIView: UIView {
+    func performBurst(color: UIColor) {
+        let layer = CAShapeLayer()
+        layer.frame = bounds
+        // Match capsule shape (cornerRadius = height/2)
+        let path = UIBezierPath(roundedRect: bounds, cornerRadius: bounds.height / 2)
+        layer.path = path.cgPath
+        
+        layer.strokeColor = color.withAlphaComponent(0.5).cgColor // Lighter/Subtle
+        layer.fillColor = UIColor.clear.cgColor
+        layer.lineWidth = 1.5
+        // Premium subtle lines: Dash pattern
+        layer.lineDashPattern = [2, 6] // Short dashes, wider gaps
+        layer.lineCap = .round
+        
+        self.layer.addSublayer(layer)
+        
+        // Scale Animation (Radiate outwards)
+        let scaleAnim = CABasicAnimation(keyPath: "transform.scale")
+        scaleAnim.fromValue = 1.0
+        scaleAnim.toValue = 1.35
+        
+        // Opacity Animation (Fade out)
+        let opacityAnim = CABasicAnimation(keyPath: "opacity")
+        opacityAnim.fromValue = 1.0
+        opacityAnim.toValue = 0.0
+        
+        let group = CAAnimationGroup()
+        group.animations = [scaleAnim, opacityAnim]
+        group.duration = 0.5
+        group.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        group.isRemovedOnCompletion = false
+        group.fillMode = .forwards
+        
+        layer.add(group, forKey: "burst")
+        
+        // Cleanup
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
+            layer.removeFromSuperlayer()
+        }
     }
 }
 
