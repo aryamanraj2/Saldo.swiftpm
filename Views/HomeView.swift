@@ -23,6 +23,9 @@ struct HomeView: View {
     
     // Subscription Data
     @State private var subscriptions: [SubscriptionItem] = []
+    
+    // Grail Data
+    @State private var grails: [GrailItem] = []
 
     // Sheet Detent State (Controlled by HomeView)
     @State private var sheetDetent: PresentationDetent = .scannerMedium
@@ -248,7 +251,9 @@ struct HomeView: View {
                 }
             }
         }) {
-            SubscriptionSheet(colors: colors)
+            GrailSheet(colors: colors) { newGrail in
+                grails.append(newGrail)
+            }
         }
         // Add Subscription Sheet (for subscription plus button in scanner sheet)
         .sheet(isPresented: $showAddSubscriptionSheet, onDismiss: {
