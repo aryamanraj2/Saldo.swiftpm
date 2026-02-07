@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - Sheet Height Preference Key (Apple Maps-style)
 // Allows child views (the sheet) to report their size to the parent.
@@ -489,24 +490,77 @@ struct WeeklySpendCard: View {
 }
 
 // MARK: - Action Button
+struct GrailPreviewItem: Identifiable, Equatable {
+    let id: UUID
+    let name: String
+    let category: GrailCategory
+    let image: UIImage?
+}
+
+struct GrailMiniCollageView: View {
+    var previews: [GrailPreviewItem]
+    var colors: ThemeColors
+
+    var body: some View {
+        HStack(spacing: -8) {
+            ForEach(Array(previews.prefix(3).enumerated()), id: \.element.id) { index, preview in
+                ZStack {
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: 28, height: 28)
+                        .shadow(color: .black.opacity(0.08), radius: 2, x: 0, y: 1)
+
+                    if let image = preview.image {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 20, height: 20)
+                    } else {
+                        if preview.category == .misc && !preview.name.isEmpty {
+                            Text(String(preview.name.prefix(1).uppercased()))
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundStyle(colors.accent)
+                        } else {
+                            Image(systemName: preview.category.iconName)
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(colors.accent)
+                        }
+                    }
+                }
+                .offset(y: index == 1 ? -4 : 0)
+            }
+        }
+        .frame(width: 56, height: 56)
+        .background(
+            Circle()
+                .fill(colors.primary.opacity(0.05))
+        )
+    }
+}
+
 struct ActionButton: View {
     var icon: String
     var title: String
     var subtitle: String
     var colors: ThemeColors
+    var grailPreviews: [GrailPreviewItem] = []
     var action: () -> Void
     
     var body: some View {
         Button(action: action) {
             VStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(colors.primary.opacity(0.05))
-                        .frame(width: 56, height: 56)
-                    
-                    Image(systemName: icon)
-                        .font(.title2)
-                        .foregroundStyle(colors.primary)
+                if grailPreviews.isEmpty {
+                    ZStack {
+                        Circle()
+                            .fill(colors.primary.opacity(0.05))
+                            .frame(width: 56, height: 56)
+                        
+                        Image(systemName: icon)
+                            .font(.title2)
+                            .foregroundStyle(colors.primary)
+                    }
+                } else {
+                    GrailMiniCollageView(previews: grailPreviews, colors: colors)
                 }
                 
                 VStack(spacing: 4) {

@@ -25,7 +25,8 @@ struct HomeView: View {
     @State private var subscriptions: [SubscriptionItem] = []
     
     // Grail Data
-    @State private var grails: [GrailItem] = []
+    @State private var grailStore = GrailStore()
+    @State private var hasLoadedGrails = false
 
     // Sheet Detent State (Controlled by HomeView)
     @State private var sheetDetent: PresentationDetent = .scannerMedium
@@ -88,6 +89,7 @@ struct HomeView: View {
                                     title: "Add",
                                     subtitle: "Grails",
                                     colors: colors,
+                                    grailPreviews: grailStore.previewItems(limit: 3),
                                     action: {
                                         // Dismiss scanner sheet with animation, then show grails sheet
                                         withAnimation(.easeOut(duration: 0.25)) {
@@ -251,8 +253,10 @@ struct HomeView: View {
                 }
             }
         }) {
-            GrailSheet(colors: colors) { newGrail in
-                grails.append(newGrail)
+            GrailSheet(colors: colors) { newGrail, maskedImage in
+                Task {
+                    await grailStore.add(grail: newGrail, maskedImage: maskedImage)
+                }
             }
         }
         // Add Subscription Sheet (for subscription plus button in scanner sheet)
@@ -274,10 +278,14 @@ struct HomeView: View {
                 ProcessingOverlay()
             }
         }
+        .task {
+            guard !hasLoadedGrails else { return }
+            hasLoadedGrails = true
+            await grailStore.load()
+        }
     }
 }
 
 #Preview {
     HomeView()
 }
-

@@ -1,5 +1,7 @@
 import SwiftUI
 import UIKit
+import PhotosUI
+import UniformTypeIdentifiers
 
 // MARK: - Presentation Detent for Grail Sheet
 extension PresentationDetent {
@@ -12,21 +14,27 @@ struct GrailSheet: View {
     var colors: ThemeColors
     
     // Binding to save the grail
-    var onSave: ((GrailItem) -> Void)? = nil
+    var onSave: ((GrailItem, UIImage?) -> Void)? = nil
     
     // Form State
     @State private var grailName: String = ""
     @State private var targetAmount: String = ""
     @State private var selectedCurrency: CurrencyOption = CurrencyOption.options[0]
     @State private var selectedCategory: GrailCategory = .sneakers
-    @State private var selectedImage: UIImage?
+    @State private var rawSelectedImage: UIImage?
+    @State private var maskedSelectedImage: UIImage?
+    @State private var isMaskingImage = false
+    @State private var maskingErrorMessage: String?
+    @State private var maskingTask: Task<Void, Never>?
     @State private var isImagePickerPresented = false
+    
+    private let imageMaskingService = GrailImageMaskingService()
     
     @FocusState private var isNameFocused: Bool
     @FocusState private var isAmountFocused: Bool
     
     var canSave: Bool {
-        !grailName.isEmpty && !targetAmount.isEmpty && Double(targetAmount) != nil
+        !grailName.isEmpty && !targetAmount.isEmpty && Double(targetAmount) != nil && !isMaskingImage
     }
     
     var body: some View {
@@ -39,14 +47,32 @@ struct GrailSheet: View {
             ScrollView {
                 VStack(spacing: 24) {
                     GrailIconPicker(
-                        selectedImage: selectedImage,
+                        selectedImage: maskedSelectedImage,
                         category: selectedCategory,
                         name: grailName,
-                        colors: colors
+                        colors: colors,
+                        isMaskingImage: isMaskingImage
                     ) {
-                        isImagePickerPresented = true
+                        dismissKeyboard()
+                        isNameFocused = false
+                        isAmountFocused = false
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                            isImagePickerPresented = true
+                        }
                     }
                     .padding(.top, 20)
+                    
+                    if let maskingErrorMessage {
+                        Text(maskingErrorMessage)
+                            .font(.caption)
+                            .foregroundStyle(Color.saldoSecondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 28)
+                    } else if isMaskingImage, rawSelectedImage != nil {
+                        Text("Removing background...")
+                            .font(.caption)
+                            .foregroundStyle(Color.saldoSecondary)
+                    }
                     
                     GrailCategoryPicker(
                         selectedCategory: $selectedCategory,
@@ -175,8 +201,15 @@ struct GrailSheet: View {
         .presentationDetents([.grailLarge])
         .presentationDragIndicator(.visible)
         .modifier(GrailSheetEnhancements(cornerRadius: 32))
-        .sheet(isPresented: $isImagePickerPresented) {
-            GrailImagePicker(selectedImage: $selectedImage)
+        .fullScreenCover(isPresented: $isImagePickerPresented) {
+            GrailImagePicker { image in
+                handleImagePicked(image)
+            } onLoadFailure: {
+                maskingErrorMessage = "Couldn't load that image. Try another one."
+            }
+        }
+        .onDisappear {
+            maskingTask?.cancel()
         }
     }
     
@@ -191,8 +224,43 @@ struct GrailSheet: View {
             strictness: .balanced
         )
         
-        onSave?(grail)
+        onSave?(grail, maskedSelectedImage)
         dismiss()
+    }
+    
+    private func handleImagePicked(_ image: UIImage) {
+        rawSelectedImage = image
+        maskedSelectedImage = nil
+        maskingErrorMessage = nil
+        isMaskingImage = true
+        
+        maskingTask?.cancel()
+        maskingTask = Task {
+            do {
+                let maskedImage = try await imageMaskingService.maskLargestForegroundSubject(from: image)
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    maskedSelectedImage = maskedImage
+                    isMaskingImage = false
+                }
+            } catch {
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    maskedSelectedImage = nil
+                    isMaskingImage = false
+                    if let maskingError = error as? GrailImageMaskingService.Error,
+                       maskingError == .unsupportedEnvironment {
+                        maskingErrorMessage = "Simulator can't run background masking. Test on a physical iPhone."
+                    } else {
+                        maskingErrorMessage = "Couldn't isolate subject. We'll use your grail icon."
+                    }
+                }
+            }
+        }
+    }
+    
+    private func dismissKeyboard() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
     }
 }
 
@@ -253,6 +321,7 @@ struct GrailIconPicker: View {
     var category: GrailCategory
     var name: String
     var colors: ThemeColors
+    var isMaskingImage: Bool
     var onTap: () -> Void
     
     var body: some View {
@@ -266,6 +335,16 @@ struct GrailIconPicker: View {
                         colors: colors
                     )
                     .frame(width: 112, height: 112)
+                    .overlay {
+                        if isMaskingImage {
+                            Circle()
+                                .fill(.ultraThinMaterial.opacity(0.95))
+                                .overlay {
+                                    ProgressView()
+                                        .tint(colors.accent)
+                                }
+                        }
+                    }
                     
                     Image(systemName: "photo.on.rectangle.angled")
                         .font(.system(size: 12, weight: .semibold))
@@ -318,9 +397,8 @@ struct GrailIconPreview: View {
             if let selectedImage {
                 Image(uiImage: selectedImage)
                     .resizable()
-                    .scaledToFill()
-                    .frame(width: 104, height: 104)
-                    .clipShape(Circle())
+                    .scaledToFit()
+                    .frame(width: 96, height: 96)
                     .transition(.opacity.combined(with: .scale(scale: 0.95)))
             } else {
                 Group {
@@ -391,9 +469,11 @@ struct GrailCategoryChip: View {
     
     var body: some View {
         Button(action: {
+            #if !targetEnvironment(simulator)
             let generator = UIImpactFeedbackGenerator(style: .medium)
             generator.prepare()
             generator.impactOccurred()
+            #endif
             
             burstTrigger += 1
             action()
@@ -525,42 +605,74 @@ struct GrailSheetHeader: View {
 
 // MARK: - UIKit Image Picker
 struct GrailImagePicker: UIViewControllerRepresentable {
-    @Binding var selectedImage: UIImage?
+    var onImagePicked: (UIImage) -> Void
+    var onLoadFailure: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
     
-    func makeUIViewController(context: Context) -> UIImagePickerController {
-        let picker = UIImagePickerController()
-        picker.sourceType = .photoLibrary
+    func makeUIViewController(context: Context) -> PHPickerViewController {
+        var configuration = PHPickerConfiguration()
+        configuration.filter = .images
+        configuration.selectionLimit = 1
+        configuration.preferredAssetRepresentationMode = .current
+        
+        let picker = PHPickerViewController(configuration: configuration)
+        picker.modalPresentationStyle = .fullScreen
         picker.delegate = context.coordinator
-        picker.allowsEditing = true
         return picker
     }
     
-    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+    func updateUIViewController(_ uiViewController: PHPickerViewController, context: Context) {}
     
-    final class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
+    final class Coordinator: NSObject, PHPickerViewControllerDelegate {
         private let parent: GrailImagePicker
         
         init(_ parent: GrailImagePicker) {
             self.parent = parent
         }
         
-        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
-            parent.dismiss()
-        }
-        
-        func imagePickerController(
-            _ picker: UIImagePickerController,
-            didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]
-        ) {
-            if let image = (info[.editedImage] ?? info[.originalImage]) as? UIImage {
-                parent.selectedImage = image
+        func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+            guard let provider = results.first?.itemProvider else {
+                parent.dismiss()
+                return
             }
+            
             parent.dismiss()
+            
+            if provider.canLoadObject(ofClass: UIImage.self) {
+                provider.loadObject(ofClass: UIImage.self) { object, _ in
+                    let imageData = (object as? UIImage)?.pngData()
+                    DispatchQueue.main.async {
+                        guard let imageData,
+                              let image = UIImage(data: imageData) else {
+                            self.parent.onLoadFailure?()
+                            return
+                        }
+                        self.parent.onImagePicked(image)
+                    }
+                }
+                return
+            }
+            
+            if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
+                provider.loadDataRepresentation(forTypeIdentifier: UTType.image.identifier) { data, _ in
+                    let imageData = data
+                    DispatchQueue.main.async {
+                        guard let imageData,
+                              let image = UIImage(data: imageData) else {
+                            self.parent.onLoadFailure?()
+                            return
+                        }
+                        self.parent.onImagePicked(image)
+                    }
+                }
+                return
+            }
+            
+            parent.onLoadFailure?()
         }
     }
 }

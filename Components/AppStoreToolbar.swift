@@ -60,26 +60,24 @@ struct AppStoreToolbarModifier<T1: View, T2: View, C1: View, C2: View>: ViewModi
                     // Trailing Items (Top Right)
                     ToolbarItem(placement: .topBarTrailing) {
                         ZStack(alignment: .trailing) {
-                            if !isChanged {
-                                beforeTrailing()
-                            }
-                            
-                            if isChanged {
-                                afterTrailing()
-                            }
+                            beforeTrailing()
+                                .opacity(isChanged ? 0 : 1)
+                                .allowsHitTesting(!isChanged)
+                            afterTrailing()
+                                .opacity(isChanged ? 1 : 0)
+                                .allowsHitTesting(isChanged)
                         }
                     }
                     
                     // Center Items (Title Area)
                     ToolbarItem(placement: .principal) {
                         ZStack {
-                            if !isChanged {
-                                beforeCenter()
-                            }
-                            
-                            if isChanged {
-                                afterCenter()
-                            }
+                            beforeCenter()
+                                .opacity(isChanged ? 0 : 1)
+                                .allowsHitTesting(!isChanged)
+                            afterCenter()
+                                .opacity(isChanged ? 1 : 0)
+                                .allowsHitTesting(isChanged)
                         }
                     }
                 }
