@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - Presentation Detent for Grail Sheet
 extension PresentationDetent {
@@ -18,7 +19,8 @@ struct GrailSheet: View {
     @State private var targetAmount: String = ""
     @State private var selectedCurrency: CurrencyOption = CurrencyOption.options[0]
     @State private var selectedCategory: GrailCategory = .sneakers
-    @State private var selectedStrictness: GrailStrictness = .balanced
+    @State private var selectedImage: UIImage?
+    @State private var isImagePickerPresented = false
     
     @FocusState private var isNameFocused: Bool
     @FocusState private var isAmountFocused: Bool
@@ -29,34 +31,31 @@ struct GrailSheet: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // MARK: - Header with Cancel Button (Glass Style)
             GrailSheetHeader(colors: colors, onCancel: { dismiss() })
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
                 .padding(.bottom, 20)
             
-            // MARK: - Main Content Area
             ScrollView {
-                VStack(spacing: 28) {
-                    // Icon Preview
-                    GrailIconPreview(
+                VStack(spacing: 24) {
+                    GrailIconPicker(
+                        selectedImage: selectedImage,
                         category: selectedCategory,
                         name: grailName,
                         colors: colors
-                    )
+                    ) {
+                        isImagePickerPresented = true
+                    }
                     .padding(.top, 20)
                     
-                    // Category Picker (Pill-shaped chips)
                     GrailCategoryPicker(
                         selectedCategory: $selectedCategory,
                         colors: colors
                     )
                     
-                    // Form Fields
-                    VStack(spacing: 24) {
-                        // Name Input
+                    VStack(spacing: 18) {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("What's the name of your Grail?")
+                            Text("Name your Grail")
                                 .font(.subheadline)
                                 .fontWeight(.semibold)
                                 .foregroundStyle(Color.saldoPrimary)
@@ -72,15 +71,13 @@ struct GrailSheet: View {
                                 .focused($isNameFocused)
                         }
                         
-                        // Amount & Currency
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("How much do you want to save?")
+                            Text("Monthly save target")
                                 .font(.subheadline)
                                 .fontWeight(.semibold)
                                 .foregroundStyle(Color.saldoPrimary)
                             
                             HStack(spacing: 12) {
-                                // Currency Selector
                                 Menu {
                                     ForEach(CurrencyOption.options) { option in
                                         Button(action: {
@@ -116,7 +113,6 @@ struct GrailSheet: View {
                                     }
                                 }
                                 
-                                // Amount Input
                                 TextField("0.00", text: $targetAmount)
                                     .font(.title3)
                                     .fontWeight(.semibold)
@@ -131,64 +127,32 @@ struct GrailSheet: View {
                                     .frame(maxWidth: .infinity)
                             }
                         }
-                        
-                        // Strictness Picker
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("How strict should your Grail be?")
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
-                                .foregroundStyle(Color.saldoPrimary)
-                            
-                            HStack(spacing: 10) {
-                                ForEach(GrailStrictness.allCases) { strictness in
-                                    StrictnessOption(
-                                        strictness: strictness,
-                                        isSelected: selectedStrictness == strictness,
-                                        colors: colors
-                                    ) {
-                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                            selectedStrictness = strictness
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 18)
+                    .background {
+                        GrailFormCardBackground(colors: colors)
                     }
                     .padding(.horizontal, 20)
                     
-                    // Save Button
-                    Button(action: {
-                        guard let amountValue = Double(targetAmount) else { return }
-                        let grail = GrailItem(
-                            name: grailName,
-                            targetAmount: amountValue,
-                            currency: selectedCurrency.symbol,
-                            category: selectedCategory,
-                            strictness: selectedStrictness
-                        )
-                        onSave?(grail)
-                        dismiss()
-                    }) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "crown.fill")
-                                .font(.system(size: 18, weight: .semibold))
-                            Text("Add Grail")
-                                .font(.body)
-                                .fontWeight(.semibold)
-                        }
-                        .foregroundStyle(canSave ? Color.white : Color.saldoSecondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .fill(canSave ? colors.accent : Color.saldoSecondary.opacity(0.2))
-                        )
+                    Button(action: saveGrail) {
+                        Text("Add Grail")
+                            .font(.body)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(canSave ? Color.white : Color.saldoSecondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .fill(canSave ? colors.accent : Color.saldoSecondary.opacity(0.2))
+                            )
                     }
                     .disabled(!canSave)
                     .padding(.horizontal, 20)
-                    .padding(.bottom, 40)
+                    .padding(.bottom, 36)
                 }
             }
+            .scrollIndicators(.hidden)
             .scrollDismissesKeyboard(.interactively)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -211,11 +175,28 @@ struct GrailSheet: View {
         .presentationDetents([.grailLarge])
         .presentationDragIndicator(.visible)
         .modifier(GrailSheetEnhancements(cornerRadius: 32))
+        .sheet(isPresented: $isImagePickerPresented) {
+            GrailImagePicker(selectedImage: $selectedImage)
+        }
+    }
+    
+    private func saveGrail() {
+        guard let amountValue = Double(targetAmount) else { return }
+        
+        let grail = GrailItem(
+            name: grailName,
+            targetAmount: amountValue,
+            currency: selectedCurrency.symbol,
+            category: selectedCategory,
+            strictness: .balanced
+        )
+        
+        onSave?(grail)
+        dismiss()
     }
 }
 
 // MARK: - Helper Views
-
 struct GlassBackgroundField: View {
     var isFocused: Bool
     var colors: ThemeColors
@@ -245,55 +226,85 @@ struct GlassBackgroundField: View {
     }
 }
 
-struct StrictnessOption: View {
-    var strictness: GrailStrictness
-    var isSelected: Bool
+struct GrailFormCardBackground: View {
     var colors: ThemeColors
-    var action: () -> Void
     
     var body: some View {
-        Button(action: {
-            let generator = UIImpactFeedbackGenerator(style: .light)
-            generator.impactOccurred()
-            action()
-        }) {
-            VStack(spacing: 8) {
-                Image(systemName: strictness.iconName)
-                    .font(.system(size: 20, weight: .semibold))
+        if #available(iOS 26, *) {
+            Color.clear
+                .glassEffect(.regular, in: .rect(cornerRadius: 18))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(colors.accent.opacity(0.12), lineWidth: 1)
+                )
+        } else {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(.white.opacity(0.16), lineWidth: 0.5)
+                )
+        }
+    }
+}
+
+struct GrailIconPicker: View {
+    var selectedImage: UIImage?
+    var category: GrailCategory
+    var name: String
+    var colors: ThemeColors
+    var onTap: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 10) {
+            Button(action: onTap) {
+                ZStack(alignment: .bottomTrailing) {
+                    GrailIconPreview(
+                        selectedImage: selectedImage,
+                        category: category,
+                        name: name,
+                        colors: colors
+                    )
+                    .frame(width: 112, height: 112)
+                    
+                    Image(systemName: "photo.on.rectangle.angled")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(colors.accent)
+                        .frame(width: 30, height: 30)
+                        .background {
+                            if #available(iOS 26, *) {
+                                Color.clear
+                                    .glassEffect(.regular.interactive(), in: .circle)
+                            } else {
+                                Circle()
+                                    .fill(.ultraThinMaterial)
+                                    .overlay(
+                                        Circle()
+                                            .strokeBorder(.white.opacity(0.25), lineWidth: 0.5)
+                                    )
+                            }
+                        }
+                        .offset(x: 4, y: 4)
+                }
+            }
+            .buttonStyle(.plain)
+            
+            VStack(spacing: 2) {
+                Text("Choose Grail visual")
+                    .font(.footnote)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Color.saldoPrimary)
                 
-                Text(strictness.rawValue)
-                    .font(.caption)
-                    .fontWeight(.bold)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .foregroundStyle(isSelected ? Color.white : colors.accent)
-            .background {
-                if isSelected {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(colors.accent)
-                } else {
-                    if #available(iOS 26, *) {
-                        Color.clear
-                            .glassEffect(.regular, in: .rect(cornerRadius: 12))
-                    } else {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(colors.accent.opacity(0.1))
-                    }
-                }
-            }
-            .overlay {
-                if !isSelected {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .strokeBorder(colors.accent.opacity(0.2), lineWidth: 1)
-                }
+                Text("Tap to open your gallery")
+                    .font(.caption2)
+                    .foregroundStyle(Color.saldoSecondary)
             }
         }
-        .buttonStyle(.plain)
     }
 }
 
 struct GrailIconPreview: View {
+    var selectedImage: UIImage?
     var category: GrailCategory
     var name: String
     var colors: ThemeColors
@@ -302,27 +313,39 @@ struct GrailIconPreview: View {
         ZStack {
             Circle()
                 .fill(colors.accent.opacity(0.12))
-                .frame(width: 100, height: 100)
+                .frame(width: 112, height: 112)
             
-            Group {
-                if category == .misc && !name.isEmpty {
-                    // Show first letter for misc
-                    Text(String(name.prefix(1).uppercased()))
-                        .font(.system(size: 36, weight: .bold))
-                        .id("text-\(name.prefix(1))")
-                } else {
-                    // Show SF Symbol
-                    Image(systemName: category.iconName)
-                        .font(.system(size: 40, weight: .semibold))
-                        .contentTransition(.symbolEffect(.replace))
-                        .id(category.iconName)
+            if let selectedImage {
+                Image(uiImage: selectedImage)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 104, height: 104)
+                    .clipShape(Circle())
+                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+            } else {
+                Group {
+                    if category == .misc && !name.isEmpty {
+                        Text(String(name.prefix(1).uppercased()))
+                            .font(.system(size: 38, weight: .bold))
+                            .id("text-\(name.prefix(1))")
+                    } else {
+                        Image(systemName: category.iconName)
+                            .font(.system(size: 42, weight: .semibold))
+                            .contentTransition(.symbolEffect(.replace))
+                            .id(category.iconName)
+                    }
                 }
+                .foregroundStyle(colors.accent)
+                .transition(.scale(scale: 0.8).combined(with: .opacity))
             }
-            .foregroundStyle(colors.accent)
-            .transition(.scale(scale: 0.8).combined(with: .opacity))
         }
+        .overlay(
+            Circle()
+                .strokeBorder(colors.accent.opacity(0.3), style: StrokeStyle(lineWidth: 1.25, dash: [4, 5]))
+        )
         .animation(.spring(response: 0.35, dampingFraction: 0.7), value: category)
         .animation(.spring(response: 0.35, dampingFraction: 0.7), value: name)
+        .animation(.spring(response: 0.35, dampingFraction: 0.7), value: selectedImage)
     }
 }
 
@@ -344,13 +367,12 @@ struct GrailCategoryPicker: View {
                         GrailCategoryChip(
                             category: category,
                             isSelected: selectedCategory == category,
-                            colors: colors,
-                            action: {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                    selectedCategory = category
-                                }
+                            colors: colors
+                        ) {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.72)) {
+                                selectedCategory = category
                             }
-                        )
+                        }
                     }
                 }
                 .padding(.horizontal, 20)
@@ -365,15 +387,21 @@ struct GrailCategoryChip: View {
     var colors: ThemeColors
     var action: () -> Void
     
+    @State private var burstTrigger = 0
+    
     var body: some View {
         Button(action: {
             let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.prepare()
             generator.impactOccurred()
+            
+            burstTrigger += 1
             action()
         }) {
             HStack(spacing: 8) {
                 Image(systemName: category.iconName)
                     .font(.system(size: 16, weight: .semibold))
+                    .symbolVariant(isSelected ? .fill : .none)
                 
                 Text(category.rawValue)
                     .font(.subheadline)
@@ -383,8 +411,22 @@ struct GrailCategoryChip: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
             .background(
+                ZStack {
+                    Capsule()
+                        .fill(isSelected ? colors.accent : colors.accent.opacity(0.12))
+                    
+                    BurstEffectView(
+                        trigger: burstTrigger,
+                        color: UIColor(colors.accent)
+                    )
+                }
+            )
+            .overlay(
                 Capsule()
-                    .fill(isSelected ? colors.accent : colors.accent.opacity(0.12))
+                    .strokeBorder(
+                        isSelected ? Color.clear : colors.accent.opacity(0.3),
+                        lineWidth: 1
+                    )
             )
         }
         .buttonStyle(.plain)
@@ -397,7 +439,6 @@ struct GrailSheetHeader: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            // Cancel button with glass effect
             if #available(iOS 26, *) {
                 Button(action: onCancel) {
                     Image(systemName: "xmark")
@@ -421,7 +462,6 @@ struct GrailSheetHeader: View {
                 }
             }
             
-            // Title pill (matches scan receipt bar style)
             if #available(iOS 26, *) {
                 HStack(spacing: 8) {
                     ZStack {
@@ -429,7 +469,7 @@ struct GrailSheetHeader: View {
                             .fill(colors.accent.opacity(0.12))
                             .frame(width: 32, height: 32)
                         
-                        Image(systemName: "crown.fill")
+                        Image(systemName: "target")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(colors.accent)
                     }
@@ -453,7 +493,7 @@ struct GrailSheetHeader: View {
                             .fill(colors.accent.opacity(0.12))
                             .frame(width: 32, height: 32)
                         
-                        Image(systemName: "crown.fill")
+                        Image(systemName: "target")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(colors.accent)
                     }
@@ -479,6 +519,48 @@ struct GrailSheetHeader: View {
                         .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
                 )
             }
+        }
+    }
+}
+
+// MARK: - UIKit Image Picker
+struct GrailImagePicker: UIViewControllerRepresentable {
+    @Binding var selectedImage: UIImage?
+    @Environment(\.dismiss) private var dismiss
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = .photoLibrary
+        picker.delegate = context.coordinator
+        picker.allowsEditing = true
+        return picker
+    }
+    
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+    
+    final class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
+        private let parent: GrailImagePicker
+        
+        init(_ parent: GrailImagePicker) {
+            self.parent = parent
+        }
+        
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.dismiss()
+        }
+        
+        func imagePickerController(
+            _ picker: UIImagePickerController,
+            didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]
+        ) {
+            if let image = (info[.editedImage] ?? info[.originalImage]) as? UIImage {
+                parent.selectedImage = image
+            }
+            parent.dismiss()
         }
     }
 }

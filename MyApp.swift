@@ -24,6 +24,7 @@ struct MyApp: App {
                     OnboardingView(isOnboardingComplete: $hasCompletedOnboarding)
                 }
             }
+            .environment(\.colorScheme, .light)
             .preferredColorScheme(.light) // Force light mode, ignore system dark mode
         }
     }

@@ -45,13 +45,12 @@ extension View {
 // MARK: - Dynamic Background
 struct CleanBackground: View {
     var colors: ThemeColors
-    @Environment(\.colorScheme) var colorScheme
-    @State private var animate = false
+    @State private var animate = true
+    @State private var hasStartedAnimation = false
 
-    // Blur values - slightly more in dark mode for subtle glow
-    private var blob1Blur: CGFloat { colorScheme == .dark ? 100 : 80 }
-    private var blob2Blur: CGFloat { colorScheme == .dark ? 120 : 100 }
-    private var blob3Blur: CGFloat { colorScheme == .dark ? 110 : 90 }
+    private let blob1Blur: CGFloat = 80
+    private let blob2Blur: CGFloat = 100
+    private let blob3Blur: CGFloat = 90
 
     var body: some View {
         ZStack {
@@ -89,14 +88,24 @@ struct CleanBackground: View {
             }
             .ignoresSafeArea()
         }
-        .onAppear {
+        .onGeometryChange(for: CGSize.self) { proxy in
+            proxy.size
+        } action: { _, newSize in
+            guard newSize != .zero else { return }
+            startBlobAnimationIfNeeded()
+        }
+    }
+
+    private func startBlobAnimationIfNeeded() {
+        guard !hasStartedAnimation else { return }
+        hasStartedAnimation = true
+
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(120))
             withAnimation(.easeInOut(duration: 7).repeatForever(autoreverses: true)) {
                 animate.toggle()
             }
         }
-        // Animate color changes smoothly
-        .animation(.easeInOut(duration: 0.8), value: colors.background)
-        .animation(.easeInOut(duration: 1.0), value: colors.backgroundBlob1)
     }
 }
 
@@ -596,4 +605,3 @@ struct TransactionRow: View {
         .liquidGlass(cornerRadius: 20, material: .regular, shadowColor: colors.accent)
     }
 }
-
