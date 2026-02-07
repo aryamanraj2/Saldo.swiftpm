@@ -23,6 +23,7 @@ final class GrailStore {
         do {
             let loaded = try loadGrails()
             grails = loaded.sorted(by: { $0.createdAt > $1.createdAt })
+            try normalizeStoredImagesIfNeeded()
             try cleanupOrphanedImages(referencedBy: grails)
         } catch {
             print("⚠️ [GrailStore] Failed to load grails: \(error.localizedDescription)")
@@ -63,7 +64,10 @@ final class GrailStore {
                 id: grail.id,
                 name: grail.name,
                 category: grail.category,
-                image: loadImage(for: grail)
+                image: loadImage(for: grail),
+                targetAmount: grail.targetAmount,
+                currentAmount: grail.currentAmount,
+                currency: grail.currency
             )
         }
     }
@@ -108,6 +112,105 @@ final class GrailStore {
         for file in files where !referencedFiles.contains(file.lastPathComponent) {
             try? fileManager.removeItem(at: file)
         }
+    }
+    
+    // Re-normalize older saved cutouts that were stored with too much transparent padding.
+    private func normalizeStoredImagesIfNeeded() throws {
+        for grail in grails {
+            guard let filename = grail.maskedImageFilename else { continue }
+            let url = imagesDirectoryURL().appendingPathComponent(filename, isDirectory: false)
+            guard let image = UIImage(contentsOfFile: url.path),
+                  let normalized = normalizedImageIfNeeded(image),
+                  let png = normalized.pngData() else {
+                continue
+            }
+            try png.write(to: url, options: .atomic)
+        }
+    }
+    
+    private func normalizedImageIfNeeded(_ image: UIImage) -> UIImage? {
+        guard let cgImage = image.cgImage else { return nil }
+        guard let bounds = alphaBoundingRect(in: cgImage) else { return nil }
+        
+        let imageMax = CGFloat(max(cgImage.width, cgImage.height))
+        let subjectMax = max(bounds.width, bounds.height)
+        let occupancy = subjectMax / imageMax
+        guard occupancy < 0.9 else { return nil }
+        
+        guard let cropped = cgImage.cropping(to: bounds.integral) else { return nil }
+        
+        let targetOccupancy: CGFloat = 0.96
+        let subjectSide = CGFloat(max(cropped.width, cropped.height))
+        let canvasSide = max(1, Int(ceil(subjectSide / targetOccupancy)))
+        let canvasSize = CGSize(width: canvasSide, height: canvasSide)
+        let drawRect = CGRect(
+            x: (canvasSize.width - CGFloat(cropped.width)) / 2,
+            y: (canvasSize.height - CGFloat(cropped.height)) / 2,
+            width: CGFloat(cropped.width),
+            height: CGFloat(cropped.height)
+        )
+        
+        let format = UIGraphicsImageRendererFormat.default()
+        format.opaque = false
+        format.scale = image.scale
+        
+        let renderer = UIGraphicsImageRenderer(size: canvasSize, format: format)
+        return renderer.image { _ in
+            UIImage(cgImage: cropped, scale: image.scale, orientation: .up).draw(in: drawRect)
+        }
+    }
+    
+    private func alphaBoundingRect(in image: CGImage, alphaThreshold: UInt8 = 8) -> CGRect? {
+        let width = image.width
+        let height = image.height
+        guard width > 0, height > 0 else { return nil }
+        
+        let bytesPerPixel = 4
+        let bytesPerRow = width * bytesPerPixel
+        var buffer = [UInt8](repeating: 0, count: bytesPerRow * height)
+        
+        let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue
+        guard let context = CGContext(
+            data: &buffer,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: bytesPerRow,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: bitmapInfo
+        ) else {
+            return nil
+        }
+        
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        
+        var minX = width
+        var minY = height
+        var maxX = 0
+        var maxY = 0
+        var found = false
+        
+        for y in 0..<height {
+            let row = y * bytesPerRow
+            for x in 0..<width {
+                let alpha = buffer[row + (x * bytesPerPixel) + 3]
+                if alpha > alphaThreshold {
+                    found = true
+                    minX = min(minX, x)
+                    minY = min(minY, y)
+                    maxX = max(maxX, x)
+                    maxY = max(maxY, y)
+                }
+            }
+        }
+        
+        guard found else { return nil }
+        return CGRect(
+            x: minX,
+            y: minY,
+            width: maxX - minX + 1,
+            height: maxY - minY + 1
+        )
     }
 
     private func ensureStorageDirectories() throws {

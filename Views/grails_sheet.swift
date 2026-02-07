@@ -395,11 +395,26 @@ struct GrailIconPreview: View {
                 .frame(width: 112, height: 112)
             
             if let selectedImage {
-                Image(uiImage: selectedImage)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 96, height: 96)
-                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
+                ZStack {
+                    Image(uiImage: selectedImage)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 104, height: 104)
+                        .scaleEffect(1.06)
+                    
+                    if let contour = GrailContourRenderer.dashedContour(
+                        for: selectedImage,
+                        color: UIColor(colors.accent)
+                    ) {
+                        Image(uiImage: contour)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 104, height: 104)
+                            .scaleEffect(1.06)
+                            .allowsHitTesting(false)
+                    }
+                }
+                .transition(.opacity.combined(with: .scale(scale: 0.95)))
             } else {
                 Group {
                     if category == .misc && !name.isEmpty {
@@ -417,10 +432,12 @@ struct GrailIconPreview: View {
                 .transition(.scale(scale: 0.8).combined(with: .opacity))
             }
         }
-        .overlay(
-            Circle()
-                .strokeBorder(colors.accent.opacity(0.3), style: StrokeStyle(lineWidth: 1.25, dash: [4, 5]))
-        )
+        .overlay {
+            if selectedImage == nil {
+                Circle()
+                    .strokeBorder(colors.accent.opacity(0.3), style: StrokeStyle(lineWidth: 1.25, dash: [4, 5]))
+            }
+        }
         .animation(.spring(response: 0.35, dampingFraction: 0.7), value: category)
         .animation(.spring(response: 0.35, dampingFraction: 0.7), value: name)
         .animation(.spring(response: 0.35, dampingFraction: 0.7), value: selectedImage)
@@ -607,10 +624,9 @@ struct GrailSheetHeader: View {
 struct GrailImagePicker: UIViewControllerRepresentable {
     var onImagePicked: (UIImage) -> Void
     var onLoadFailure: (() -> Void)? = nil
-    @Environment(\.dismiss) private var dismiss
     
     func makeCoordinator() -> Coordinator {
-        Coordinator(self)
+        Coordinator(onImagePicked: onImagePicked, onLoadFailure: onLoadFailure)
     }
     
     func makeUIViewController(context: Context) -> PHPickerViewController {
@@ -628,30 +644,32 @@ struct GrailImagePicker: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: PHPickerViewController, context: Context) {}
     
     final class Coordinator: NSObject, PHPickerViewControllerDelegate {
-        private let parent: GrailImagePicker
+        private let onImagePicked: (UIImage) -> Void
+        private let onLoadFailure: (() -> Void)?
         
-        init(_ parent: GrailImagePicker) {
-            self.parent = parent
+        init(onImagePicked: @escaping (UIImage) -> Void, onLoadFailure: (() -> Void)?) {
+            self.onImagePicked = onImagePicked
+            self.onLoadFailure = onLoadFailure
         }
         
         func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
             guard let provider = results.first?.itemProvider else {
-                parent.dismiss()
+                picker.dismiss(animated: true)
                 return
             }
             
-            parent.dismiss()
+            picker.dismiss(animated: true)
             
             if provider.canLoadObject(ofClass: UIImage.self) {
                 provider.loadObject(ofClass: UIImage.self) { object, _ in
                     let imageData = (object as? UIImage)?.pngData()
-                    DispatchQueue.main.async {
+                    Task { @MainActor in
                         guard let imageData,
                               let image = UIImage(data: imageData) else {
-                            self.parent.onLoadFailure?()
+                            self.onLoadFailure?()
                             return
                         }
-                        self.parent.onImagePicked(image)
+                        self.onImagePicked(image)
                     }
                 }
                 return
@@ -660,19 +678,19 @@ struct GrailImagePicker: UIViewControllerRepresentable {
             if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
                 provider.loadDataRepresentation(forTypeIdentifier: UTType.image.identifier) { data, _ in
                     let imageData = data
-                    DispatchQueue.main.async {
+                    Task { @MainActor in
                         guard let imageData,
                               let image = UIImage(data: imageData) else {
-                            self.parent.onLoadFailure?()
+                            self.onLoadFailure?()
                             return
                         }
-                        self.parent.onImagePicked(image)
+                        self.onImagePicked(image)
                     }
                 }
                 return
             }
             
-            parent.onLoadFailure?()
+            onLoadFailure?()
         }
     }
 }

@@ -490,51 +490,283 @@ struct WeeklySpendCard: View {
 }
 
 // MARK: - Action Button
-struct GrailPreviewItem: Identifiable, Equatable {
+struct GrailPreviewItem: Identifiable {
     let id: UUID
     let name: String
     let category: GrailCategory
     let image: UIImage?
+    let targetAmount: Double
+    let currentAmount: Double
+    let currency: String
+    
+    var remainingAmount: Double {
+        max(targetAmount - currentAmount, 0)
+    }
 }
 
-struct GrailMiniCollageView: View {
-    var previews: [GrailPreviewItem]
-    var colors: ThemeColors
+@MainActor
+enum GrailContourRenderer {
+    private static let cache = NSCache<NSString, UIImage>()
 
-    var body: some View {
-        HStack(spacing: -8) {
-            ForEach(Array(previews.prefix(3).enumerated()), id: \.element.id) { index, preview in
-                ZStack {
-                    Circle()
-                        .fill(Color.white)
-                        .frame(width: 28, height: 28)
-                        .shadow(color: .black.opacity(0.08), radius: 2, x: 0, y: 1)
+    static func dashedContour(for image: UIImage, color: UIColor) -> UIImage? {
+        guard let cacheKey = cacheKey(for: image, color: color) else { return nil }
+        if let cached = cache.object(forKey: cacheKey) {
+            return cached
+        }
 
-                    if let image = preview.image {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 20, height: 20)
-                    } else {
-                        if preview.category == .misc && !preview.name.isEmpty {
-                            Text(String(preview.name.prefix(1).uppercased()))
-                                .font(.system(size: 10, weight: .bold))
-                                .foregroundStyle(colors.accent)
-                        } else {
-                            Image(systemName: preview.category.iconName)
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(colors.accent)
+        guard let cgImage = image.cgImage else {
+            return nil
+        }
+        
+        let width = cgImage.width
+        let height = cgImage.height
+        guard width > 2, height > 2 else {
+            return nil
+        }
+        
+        let bytesPerPixel = 4
+        let bytesPerRow = width * bytesPerPixel
+        var sourceBuffer = [UInt8](repeating: 0, count: bytesPerRow * height)
+        
+        let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue
+        guard let sourceContext = CGContext(
+            data: &sourceBuffer,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: bytesPerRow,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: bitmapInfo
+        ) else {
+            return nil
+        }
+        sourceContext.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+        
+        var rawEdges = [UInt8](repeating: 0, count: width * height)
+        let alphaThreshold: UInt8 = 6
+        
+        for y in 1..<(height - 1) {
+            for x in 1..<(width - 1) {
+                let index = y * width + x
+                let sourceAlpha = sourceBuffer[(index * bytesPerPixel) + 3]
+                guard sourceAlpha > alphaThreshold else { continue }
+                
+                var hasBackgroundNeighbor = false
+                for ny in (y - 1)...(y + 1) {
+                    for nx in (x - 1)...(x + 1) where !(nx == x && ny == y) {
+                        let neighborIndex = ny * width + nx
+                        let neighborAlpha = sourceBuffer[(neighborIndex * bytesPerPixel) + 3]
+                        if neighborAlpha <= alphaThreshold {
+                            hasBackgroundNeighbor = true
+                            break
+                        }
+                    }
+                    if hasBackgroundNeighbor { break }
+                }
+                
+                if hasBackgroundNeighbor {
+                    rawEdges[index] = 255
+                }
+            }
+        }
+        
+        // Thicken the real silhouette edge so it stays visible at card-preview sizes.
+        var thickEdges = rawEdges
+        let dilationRadius = max(1, Int(round(Double(max(width, height)) * 0.01)))
+        if dilationRadius > 0 {
+            for y in 1..<(height - 1) {
+                for x in 1..<(width - 1) {
+                    let index = y * width + x
+                    guard rawEdges[index] > 0 else { continue }
+                    let minY = max(0, y - dilationRadius)
+                    let maxY = min(height - 1, y + dilationRadius)
+                    let minX = max(0, x - dilationRadius)
+                    let maxX = min(width - 1, x + dilationRadius)
+                    for ny in minY...maxY {
+                        for nx in minX...maxX {
+                            thickEdges[ny * width + nx] = 255
                         }
                     }
                 }
-                .offset(y: index == 1 ? -4 : 0)
             }
         }
-        .frame(width: 56, height: 56)
-        .background(
-            Circle()
-                .fill(colors.primary.opacity(0.05))
+
+        let rgba = color.rgbaComponents
+        let dashPeriod = max(8, Int(round(Double(max(width, height)) * 0.06)))
+        let dashOnLength = max(4, Int(round(Double(dashPeriod) * 0.58)))
+
+        var output = [UInt8](repeating: 0, count: bytesPerRow * height)
+        let solidAlpha = max(160, Int(Double(rgba.a) * 0.92))
+        var edgeCounter = 0
+
+        for y in 0..<height {
+            for x in 0..<width {
+                let index = y * width + x
+                guard thickEdges[index] > 0 else { continue }
+                let phase = edgeCounter % dashPeriod
+                edgeCounter += 1
+                guard phase < dashOnLength else { continue }
+
+                let pixelOffset = index * bytesPerPixel
+                let premultipliedR = (rgba.r * solidAlpha) / 255
+                let premultipliedG = (rgba.g * solidAlpha) / 255
+                let premultipliedB = (rgba.b * solidAlpha) / 255
+
+                output[pixelOffset] = UInt8(clamping: premultipliedR)
+                output[pixelOffset + 1] = UInt8(clamping: premultipliedG)
+                output[pixelOffset + 2] = UInt8(clamping: premultipliedB)
+                output[pixelOffset + 3] = UInt8(clamping: solidAlpha)
+            }
+        }
+        
+        guard let outputContext = CGContext(
+            data: &output,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: bytesPerRow,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: bitmapInfo
+        ), let cgOutput = outputContext.makeImage() else {
+            return nil
+        }
+        
+        let rendered = UIImage(cgImage: cgOutput, scale: image.scale, orientation: .up)
+        cache.setObject(rendered, forKey: cacheKey)
+        return rendered
+    }
+
+    private static func cacheKey(for image: UIImage, color: UIColor) -> NSString? {
+        guard let data = image.pngData() else { return nil }
+        let rgba = color.rgbaComponents
+        let key = "\(data.hashValue)-\(rgba.r)-\(rgba.g)-\(rgba.b)-\(rgba.a)"
+        return key as NSString
+    }
+}
+
+private extension UIColor {
+    var rgbaComponents: (r: Int, g: Int, b: Int, a: Int) {
+        let resolved = resolvedColor(with: UITraitCollection.current)
+        if let converted = resolved.cgColor.converted(
+            to: CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB(),
+            intent: .defaultIntent,
+            options: nil
+        ), let components = converted.components {
+            if components.count >= 4 {
+                return (
+                    Int(components[0] * 255),
+                    Int(components[1] * 255),
+                    Int(components[2] * 255),
+                    Int(components[3] * 255)
+                )
+            } else if components.count == 2 {
+                let white = Int(components[0] * 255)
+                let alpha = Int(components[1] * 255)
+                return (white, white, white, alpha)
+            }
+        }
+
+        var red: CGFloat = 1
+        var green: CGFloat = 1
+        var blue: CGFloat = 1
+        var alpha: CGFloat = 1
+        if resolved.getRed(&red, green: &green, blue: &blue, alpha: &alpha) {
+            return (Int(red * 255), Int(green * 255), Int(blue * 255), Int(alpha * 255))
+        }
+
+        return (255, 255, 255, 255)
+    }
+}
+
+struct GrailSwipeGalleryView: View {
+    var previews: [GrailPreviewItem]
+    var colors: ThemeColors
+    @Binding var selectedIndex: Int
+
+    var body: some View {
+        let slides = Array(previews.prefix(10))
+        
+        VStack(spacing: 6) {
+            TabView(selection: $selectedIndex) {
+                ForEach(Array(slides.enumerated()), id: \.element.id) { index, preview in
+                    VStack(spacing: 8) {
+                        previewVisual(preview)
+                            .frame(width: 136, height: 136)
+                        
+                        Text(preview.name)
+                            .font(.footnote)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(Color.saldoPrimary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.85)
+                        
+                        Text(remainingText(for: preview))
+                            .font(.caption2)
+                            .foregroundStyle(Color.saldoSecondary)
+                            .multilineTextAlignment(.center)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.85)
+                    }
+                    .padding(.top, 2)
+                    .tag(index)
+                }
+            }
+            .frame(height: 196)
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            
+            if slides.count > 1 {
+                HStack(spacing: 5) {
+                    ForEach(0..<slides.count, id: \.self) { index in
+                        Circle()
+                            .fill(index == selectedIndex ? colors.accent : Color.saldoSecondary.opacity(0.25))
+                            .frame(width: index == selectedIndex ? 7 : 6, height: index == selectedIndex ? 7 : 6)
+                    }
+                }
+            }
+        }
+    }
+    
+    private func remainingText(for preview: GrailPreviewItem) -> String {
+        if preview.remainingAmount <= 0 {
+            return "Ready to buy"
+        }
+        let amountText = preview.remainingAmount.formatted(
+            FloatingPointFormatStyle<Double>.number.precision(.fractionLength(0...2))
         )
+        return "\(preview.currency)\(amountText) left to buy"
+    }
+    
+    @ViewBuilder
+    private func previewVisual(_ preview: GrailPreviewItem) -> some View {
+        if let image = preview.image {
+            ZStack {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 126, height: 126)
+                    .scaleEffect(1.08)
+                
+                if let contour = GrailContourRenderer.dashedContour(
+                    for: image,
+                    color: UIColor(colors.accent)
+                ) {
+                    Image(uiImage: contour)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 126, height: 126)
+                        .scaleEffect(1.08)
+                        .allowsHitTesting(false)
+                }
+            }
+        } else if preview.category == .misc && !preview.name.isEmpty {
+            Text(String(preview.name.prefix(1).uppercased()))
+                .font(.system(size: 64, weight: .bold))
+                .foregroundStyle(colors.accent)
+        } else {
+            Image(systemName: preview.category.iconName)
+                .font(.system(size: 62, weight: .semibold))
+                .foregroundStyle(colors.accent)
+        }
     }
 }
 
@@ -546,39 +778,34 @@ struct ActionButton: View {
     var grailPreviews: [GrailPreviewItem] = []
     var action: () -> Void
     
+    @State private var selectedIndex = 0
+    
     var body: some View {
-        Button(action: action) {
-            VStack(spacing: 12) {
-                if grailPreviews.isEmpty {
-                    ZStack {
-                        Circle()
-                            .fill(colors.primary.opacity(0.05))
-                            .frame(width: 56, height: 56)
-                        
-                        Image(systemName: icon)
-                            .font(.title2)
-                            .foregroundStyle(colors.primary)
-                    }
-                } else {
-                    GrailMiniCollageView(previews: grailPreviews, colors: colors)
-                }
-                
-                VStack(spacing: 4) {
-                    Text(title)
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(Color.saldoPrimary)
-                    
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(Color.saldoSecondary)
-                }
+        VStack(spacing: 0) {
+            if grailPreviews.isEmpty {
+                Image(systemName: icon)
+                    .font(.system(size: 40, weight: .semibold))
+                    .foregroundStyle(colors.primary)
+            } else {
+                GrailSwipeGalleryView(
+                    previews: grailPreviews,
+                    colors: colors,
+                    selectedIndex: $selectedIndex
+                )
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .padding()
-            .liquidGlass(cornerRadius: 20, material: .regular, shadowColor: colors.accent)
         }
-        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding()
+        .liquidGlass(cornerRadius: 20, material: .regular, shadowColor: colors.accent)
+        .contentShape(.rect(cornerRadius: 20))
+        .onTapGesture(perform: action)
+        .onChange(of: grailPreviews.count) { _, newCount in
+            if newCount == 0 {
+                selectedIndex = 0
+            } else if selectedIndex >= newCount {
+                selectedIndex = newCount - 1
+            }
+        }
     }
 }
 

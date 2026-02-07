@@ -93,8 +93,8 @@ actor GrailImageMaskingService {
         let renderMs = Date().timeIntervalSince(renderStart) * 1000
 
         logger.debug("Mask timings (ms) analysis=\(Int(analysisMs)) mask=\(Int(maskMs)) render=\(Int(renderMs))")
-
-        return UIImage(cgImage: cgImage, scale: optimized.scale, orientation: .up)
+        let maskedImage = UIImage(cgImage: cgImage, scale: optimized.scale, orientation: .up)
+        return normalizeMaskedSubject(maskedImage)
 #endif
     }
 
@@ -189,5 +189,97 @@ actor GrailImageMaskingService {
         return renderer.image { _ in
             image.draw(in: CGRect(origin: .zero, size: newSize))
         }
+    }
+    
+    private func normalizeMaskedSubject(_ image: UIImage) -> UIImage {
+        guard let cgImage = image.cgImage else {
+            return image
+        }
+        
+        guard let alphaBounds = alphaBoundingRect(in: cgImage) else {
+            return image
+        }
+        
+        guard let cropped = cgImage.cropping(to: alphaBounds) else {
+            return image
+        }
+        
+        // Keep subject footprint uniform by placing it into a padded square canvas.
+        let subjectMaxSide = CGFloat(max(cropped.width, cropped.height))
+        let targetOccupancy: CGFloat = 0.96
+        let canvasSide = max(1, Int(ceil(subjectMaxSide / targetOccupancy)))
+        let canvasSize = CGSize(width: canvasSide, height: canvasSide)
+        
+        let drawRect = CGRect(
+            x: (canvasSize.width - CGFloat(cropped.width)) / 2,
+            y: (canvasSize.height - CGFloat(cropped.height)) / 2,
+            width: CGFloat(cropped.width),
+            height: CGFloat(cropped.height)
+        )
+        
+        let format = UIGraphicsImageRendererFormat.default()
+        format.opaque = false
+        format.scale = image.scale
+        
+        let renderer = UIGraphicsImageRenderer(size: canvasSize, format: format)
+        return renderer.image { _ in
+            UIImage(cgImage: cropped, scale: image.scale, orientation: .up).draw(in: drawRect)
+        }
+    }
+    
+    private func alphaBoundingRect(in image: CGImage, alphaThreshold: UInt8 = 8) -> CGRect? {
+        let width = image.width
+        let height = image.height
+        guard width > 0, height > 0 else { return nil }
+        
+        let bytesPerPixel = 4
+        let bytesPerRow = width * bytesPerPixel
+        var buffer = [UInt8](repeating: 0, count: bytesPerRow * height)
+        
+        let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue
+        guard let context = CGContext(
+            data: &buffer,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: bytesPerRow,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: bitmapInfo
+        ) else {
+            return nil
+        }
+        
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+        
+        var minX = width
+        var minY = height
+        var maxX = 0
+        var maxY = 0
+        var foundForeground = false
+        
+        for y in 0..<height {
+            let rowOffset = y * bytesPerRow
+            for x in 0..<width {
+                let alpha = buffer[rowOffset + (x * bytesPerPixel) + 3]
+                if alpha > alphaThreshold {
+                    foundForeground = true
+                    minX = min(minX, x)
+                    minY = min(minY, y)
+                    maxX = max(maxX, x)
+                    maxY = max(maxY, y)
+                }
+            }
+        }
+        
+        guard foundForeground else {
+            return nil
+        }
+        
+        return CGRect(
+            x: minX,
+            y: minY,
+            width: maxX - minX + 1,
+            height: maxY - minY + 1
+        ).integral
     }
 }
