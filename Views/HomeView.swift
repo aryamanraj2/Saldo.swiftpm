@@ -89,7 +89,7 @@ struct HomeView: View {
                                     title: "Add",
                                     subtitle: "Grails",
                                     colors: colors,
-                                    grailPreviews: grailStore.previewItems(limit: 3),
+                                    grailPreviews: grailStore.cachedPreviewItems,
                                     action: {
                                         // Dismiss scanner sheet with animation, then show grails sheet
                                         withAnimation(.easeOut(duration: 0.25)) {
