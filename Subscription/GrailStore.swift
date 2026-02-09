@@ -1,108 +1,198 @@
 import SwiftUI
 import UIKit
+import ImageIO
 
 @MainActor
 @Observable
 final class GrailStore {
     private(set) var grails: [GrailItem] = []
+    private(set) var cachedPreviewItems: [GrailPreviewItem] = []
 
-    private let fileManager = FileManager.default
-    private let encoder: JSONEncoder = {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        encoder.dateEncodingStrategy = .iso8601
-        return encoder
-    }()
-    private let decoder: JSONDecoder = {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return decoder
+    private nonisolated static let previewLimit = 3
+    private nonisolated static let maxStoredImageDimension: CGFloat = 1024
+    private nonisolated static let previewDecodeMaxPixelSize = 320
+    private nonisolated static let imagePipelineVersion = 2
+    private nonisolated static let imagePipelineVersionKey = "aryaman.Saldo.grailImagePipelineVersion"
+    private static let contourWarmColors: [UIColor] = {
+        let themes: [AppTheme] = [.danger, .moderate, .wealthy]
+        let schemes: [ColorScheme] = [.light, .dark]
+        var colors: [UIColor] = []
+        for theme in themes {
+            for scheme in schemes {
+                colors.append(UIColor(theme.colors(for: scheme).accent))
+            }
+        }
+        return colors
     }()
 
     func load() async {
+        let metadataURL = metadataFileURL()
+        let imagesURL = imagesDirectoryURL()
+
         do {
-            let loaded = try loadGrails()
-            grails = loaded.sorted(by: { $0.createdAt > $1.createdAt })
-            try normalizeStoredImagesIfNeeded()
-            try cleanupOrphanedImages(referencedBy: grails)
+            let snapshot = try await runInBackground {
+                try Self.loadSnapshot(
+                    metadataURL: metadataURL,
+                    imagesURL: imagesURL,
+                    previewLimit: Self.previewLimit
+                )
+            }
+            grails = snapshot.grails
+            cachedPreviewItems = snapshot.previews
+            warmContourCache(for: snapshot.previews)
         } catch {
             print("⚠️ [GrailStore] Failed to load grails: \(error.localizedDescription)")
             grails = []
+            cachedPreviewItems = []
         }
     }
 
     func add(grail: GrailItem, maskedImage: UIImage?) async {
-        var storedGrail = grail
+        let metadataURL = metadataFileURL()
+        let imagesURL = imagesDirectoryURL()
+        let existingGrails = grails
 
         do {
-            try ensureStorageDirectories()
-
-            if let maskedImage, let imageData = maskedImage.pngData() {
-                let filename = "\(storedGrail.id.uuidString).png"
-                let imageURL = imagesDirectoryURL().appendingPathComponent(filename, isDirectory: false)
-                try imageData.write(to: imageURL, options: .atomic)
-                storedGrail.maskedImageFilename = filename
-            } else {
-                storedGrail.maskedImageFilename = nil
+            let snapshot = try await runInBackground {
+                try Self.addGrail(
+                    grail: grail,
+                    maskedImage: maskedImage,
+                    existingGrails: existingGrails,
+                    metadataURL: metadataURL,
+                    imagesURL: imagesURL,
+                    previewLimit: Self.previewLimit
+                )
             }
-
-            grails.insert(storedGrail, at: 0)
-            try persistGrails()
-            try cleanupOrphanedImages(referencedBy: grails)
+            grails = snapshot.grails
+            cachedPreviewItems = snapshot.previews
+            warmContourCache(for: snapshot.previews)
         } catch {
             print("⚠️ [GrailStore] Failed to add grail: \(error.localizedDescription)")
         }
     }
 
     func previewItems(limit: Int) -> [GrailPreviewItem] {
-        let recent = grails
-            .sorted(by: { $0.createdAt > $1.createdAt })
-            .prefix(limit)
+        Array(cachedPreviewItems.prefix(limit))
+    }
 
-        return recent.map { grail in
-            GrailPreviewItem(
-                id: grail.id,
-                name: grail.name,
-                category: grail.category,
-                image: loadImage(for: grail),
-                targetAmount: grail.targetAmount,
-                currentAmount: grail.currentAmount,
-                currency: grail.currency
-            )
+    private func warmContourCache(for previews: [GrailPreviewItem]) {
+        let visuals = previews.compactMap { preview -> (cacheID: String, image: UIImage)? in
+            guard let image = preview.image else { return nil }
+            return (cacheID: preview.visualCacheKey, image: image)
+        }
+        guard !visuals.isEmpty else { return }
+
+        let colors = Self.contourWarmColors
+        DispatchQueue.global(qos: .utility).async {
+            for visual in visuals {
+                GrailContourRenderer.warmCache(
+                    for: visual.image,
+                    cacheID: visual.cacheID,
+                    colors: colors
+                )
+            }
         }
     }
 
-    private func loadGrails() throws -> [GrailItem] {
-        try ensureStorageDirectories()
-        let metadataURL = metadataFileURL()
+    private func runInBackground<T>(_ work: @escaping () throws -> T) async throws -> T {
+        try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    continuation.resume(returning: try work())
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
 
+    private nonisolated struct Snapshot {
+        let grails: [GrailItem]
+        let previews: [GrailPreviewItem]
+    }
+
+    private nonisolated static func loadSnapshot(
+        metadataURL: URL,
+        imagesURL: URL,
+        previewLimit: Int
+    ) throws -> Snapshot {
+        try ensureStorageDirectories(imagesURL: imagesURL)
+        var loaded = try loadGrails(metadataURL: metadataURL)
+        loaded.sort(by: { $0.createdAt > $1.createdAt })
+        migrateImagesIfNeeded(grails: loaded, imagesURL: imagesURL)
+        try cleanupOrphanedImages(referencedBy: loaded, imagesURL: imagesURL)
+
+        let previews = buildPreviewItems(
+            from: loaded,
+            limit: previewLimit,
+            imagesURL: imagesURL
+        )
+        return Snapshot(grails: loaded, previews: previews)
+    }
+
+    private nonisolated static func addGrail(
+        grail: GrailItem,
+        maskedImage: UIImage?,
+        existingGrails: [GrailItem],
+        metadataURL: URL,
+        imagesURL: URL,
+        previewLimit: Int
+    ) throws -> Snapshot {
+        try ensureStorageDirectories(imagesURL: imagesURL)
+        var updated = existingGrails
+        var storedGrail = grail
+
+        if let maskedImage {
+            let filename = "\(storedGrail.id.uuidString).png"
+            let imageURL = imagesURL.appendingPathComponent(filename, isDirectory: false)
+            let optimized = optimizedStoredImage(from: maskedImage, maxDimension: maxStoredImageDimension)
+            if let imageData = optimized.pngData() {
+                try imageData.write(to: imageURL, options: .atomic)
+                storedGrail.maskedImageFilename = filename
+            } else {
+                storedGrail.maskedImageFilename = nil
+            }
+        } else {
+            storedGrail.maskedImageFilename = nil
+        }
+
+        updated.insert(storedGrail, at: 0)
+        updated.sort(by: { $0.createdAt > $1.createdAt })
+
+        try persistGrails(updated, metadataURL: metadataURL)
+        try cleanupOrphanedImages(referencedBy: updated, imagesURL: imagesURL)
+
+        let previews = buildPreviewItems(
+            from: updated,
+            limit: previewLimit,
+            imagesURL: imagesURL
+        )
+        return Snapshot(grails: updated, previews: previews)
+    }
+
+    private nonisolated static func loadGrails(metadataURL: URL) throws -> [GrailItem] {
+        let fileManager = FileManager.default
         guard fileManager.fileExists(atPath: metadataURL.path) else {
             return []
         }
 
         let data = try Data(contentsOf: metadataURL)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
         return try decoder.decode([GrailItem].self, from: data)
     }
 
-    private func persistGrails() throws {
-        try ensureStorageDirectories()
-        let metadataURL = metadataFileURL()
+    private nonisolated static func persistGrails(_ grails: [GrailItem], metadataURL: URL) throws {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
         let data = try encoder.encode(grails)
         try data.write(to: metadataURL, options: .atomic)
     }
 
-    private func loadImage(for grail: GrailItem) -> UIImage? {
-        guard let filename = grail.maskedImageFilename else {
-            return nil
-        }
-
-        let imageURL = imagesDirectoryURL().appendingPathComponent(filename, isDirectory: false)
-        return UIImage(contentsOfFile: imageURL.path)
-    }
-
-    private func cleanupOrphanedImages(referencedBy grails: [GrailItem]) throws {
+    private nonisolated static func cleanupOrphanedImages(referencedBy grails: [GrailItem], imagesURL: URL) throws {
+        let fileManager = FileManager.default
         let referencedFiles = Set(grails.compactMap(\.maskedImageFilename))
-        let imagesURL = imagesDirectoryURL()
         let files = try fileManager.contentsOfDirectory(
             at: imagesURL,
             includingPropertiesForKeys: nil,
@@ -113,115 +203,133 @@ final class GrailStore {
             try? fileManager.removeItem(at: file)
         }
     }
-    
-    // Re-normalize older saved cutouts that were stored with too much transparent padding.
-    private func normalizeStoredImagesIfNeeded() throws {
+
+    private nonisolated static func migrateImagesIfNeeded(grails: [GrailItem], imagesURL: URL) {
+        let defaults = UserDefaults.standard
+        let savedVersion = defaults.integer(forKey: imagePipelineVersionKey)
+        guard savedVersion < imagePipelineVersion else { return }
+
         for grail in grails {
             guard let filename = grail.maskedImageFilename else { continue }
-            let url = imagesDirectoryURL().appendingPathComponent(filename, isDirectory: false)
-            guard let image = UIImage(contentsOfFile: url.path),
-                  let normalized = normalizedImageIfNeeded(image),
-                  let png = normalized.pngData() else {
-                continue
+            let url = imagesURL.appendingPathComponent(filename, isDirectory: false)
+            guard let image = UIImage(contentsOfFile: url.path) else { continue }
+            let optimized = optimizedStoredImage(from: image, maxDimension: maxStoredImageDimension)
+            guard let pngData = optimized.pngData() else { continue }
+            do {
+                try pngData.write(to: url, options: .atomic)
+            } catch {
+                print("⚠️ [GrailStore] Failed to migrate image \(filename): \(error.localizedDescription)")
             }
-            try png.write(to: url, options: .atomic)
+        }
+
+        defaults.set(imagePipelineVersion, forKey: imagePipelineVersionKey)
+    }
+
+    private nonisolated static func buildPreviewItems(
+        from grails: [GrailItem],
+        limit: Int,
+        imagesURL: URL
+    ) -> [GrailPreviewItem] {
+        let recent = grails
+            .sorted(by: { $0.createdAt > $1.createdAt })
+            .prefix(limit)
+
+        return recent.map { grail in
+            GrailPreviewItem(
+                id: grail.id,
+                visualCacheKey: visualCacheKey(for: grail),
+                name: grail.name,
+                category: grail.category,
+                image: loadPreviewImage(for: grail, imagesURL: imagesURL),
+                targetAmount: grail.targetAmount,
+                currentAmount: grail.currentAmount,
+                currency: grail.currency
+            )
         }
     }
-    
-    private func normalizedImageIfNeeded(_ image: UIImage) -> UIImage? {
-        guard let cgImage = image.cgImage else { return nil }
-        guard let bounds = alphaBoundingRect(in: cgImage) else { return nil }
-        
-        let imageMax = CGFloat(max(cgImage.width, cgImage.height))
-        let subjectMax = max(bounds.width, bounds.height)
-        let occupancy = subjectMax / imageMax
-        guard occupancy < 0.9 else { return nil }
-        
-        guard let cropped = cgImage.cropping(to: bounds.integral) else { return nil }
-        
-        let targetOccupancy: CGFloat = 0.96
-        let subjectSide = CGFloat(max(cropped.width, cropped.height))
-        let canvasSide = max(1, Int(ceil(subjectSide / targetOccupancy)))
-        let canvasSize = CGSize(width: canvasSide, height: canvasSide)
-        let drawRect = CGRect(
-            x: (canvasSize.width - CGFloat(cropped.width)) / 2,
-            y: (canvasSize.height - CGFloat(cropped.height)) / 2,
-            width: CGFloat(cropped.width),
-            height: CGFloat(cropped.height)
-        )
-        
-        let format = UIGraphicsImageRendererFormat.default()
-        format.opaque = false
-        format.scale = image.scale
-        
-        let renderer = UIGraphicsImageRenderer(size: canvasSize, format: format)
-        return renderer.image { _ in
-            UIImage(cgImage: cropped, scale: image.scale, orientation: .up).draw(in: drawRect)
-        }
+
+    private nonisolated static func visualCacheKey(for grail: GrailItem) -> String {
+        grail.maskedImageFilename ?? grail.id.uuidString
     }
-    
-    private func alphaBoundingRect(in image: CGImage, alphaThreshold: UInt8 = 8) -> CGRect? {
-        let width = image.width
-        let height = image.height
-        guard width > 0, height > 0 else { return nil }
-        
-        let bytesPerPixel = 4
-        let bytesPerRow = width * bytesPerPixel
-        var buffer = [UInt8](repeating: 0, count: bytesPerRow * height)
-        
-        let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue
-        guard let context = CGContext(
-            data: &buffer,
-            width: width,
-            height: height,
-            bitsPerComponent: 8,
-            bytesPerRow: bytesPerRow,
-            space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: bitmapInfo
+
+    private nonisolated static func loadPreviewImage(for grail: GrailItem, imagesURL: URL) -> UIImage? {
+        guard let filename = grail.maskedImageFilename else { return nil }
+        let imageURL = imagesURL.appendingPathComponent(filename, isDirectory: false)
+        return loadDownsampledImage(
+            at: imageURL,
+            maxPixelSize: previewDecodeMaxPixelSize
+        ) ?? UIImage(contentsOfFile: imageURL.path)
+    }
+
+    private nonisolated static func loadDownsampledImage(at url: URL, maxPixelSize: Int) -> UIImage? {
+        guard let imageSource = CGImageSourceCreateWithURL(
+            url as CFURL,
+            [kCGImageSourceShouldCache: false] as CFDictionary
         ) else {
             return nil
         }
-        
-        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
-        
-        var minX = width
-        var minY = height
-        var maxX = 0
-        var maxY = 0
-        var found = false
-        
-        for y in 0..<height {
-            let row = y * bytesPerRow
-            for x in 0..<width {
-                let alpha = buffer[row + (x * bytesPerPixel) + 3]
-                if alpha > alphaThreshold {
-                    found = true
-                    minX = min(minX, x)
-                    minY = min(minY, y)
-                    maxX = max(maxX, x)
-                    maxY = max(maxY, y)
-                }
-            }
+
+        let options: CFDictionary = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize
+        ] as CFDictionary
+
+        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, options) else {
+            return nil
         }
-        
-        guard found else { return nil }
-        return CGRect(
-            x: minX,
-            y: minY,
-            width: maxX - minX + 1,
-            height: maxY - minY + 1
-        )
+
+        return UIImage(cgImage: cgImage, scale: 1, orientation: .up)
     }
 
-    private func ensureStorageDirectories() throws {
-        try fileManager.createDirectory(
-            at: imagesDirectoryURL(),
+    private nonisolated static func optimizedStoredImage(from image: UIImage, maxDimension: CGFloat) -> UIImage {
+        let normalized = normalizeOrientation(image)
+        let currentMax = max(normalized.size.width, normalized.size.height)
+        guard currentMax > maxDimension else {
+            return normalized
+        }
+
+        let scaleFactor = maxDimension / currentMax
+        let newSize = CGSize(
+            width: max(1, normalized.size.width * scaleFactor),
+            height: max(1, normalized.size.height * scaleFactor)
+        )
+
+        let format = UIGraphicsImageRendererFormat.default()
+        format.opaque = false
+        format.scale = 1
+
+        let renderer = UIGraphicsImageRenderer(size: newSize, format: format)
+        return renderer.image { _ in
+            normalized.draw(in: CGRect(origin: .zero, size: newSize))
+        }
+    }
+
+    private nonisolated static func normalizeOrientation(_ image: UIImage) -> UIImage {
+        guard image.imageOrientation != .up else {
+            return image
+        }
+
+        let format = UIGraphicsImageRendererFormat.default()
+        format.opaque = false
+        format.scale = 1
+
+        let renderer = UIGraphicsImageRenderer(size: image.size, format: format)
+        return renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: image.size))
+        }
+    }
+
+    private nonisolated static func ensureStorageDirectories(imagesURL: URL) throws {
+        try FileManager.default.createDirectory(
+            at: imagesURL,
             withIntermediateDirectories: true
         )
     }
 
     private func rootDirectoryURL() -> URL {
-        let appSupport = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         return appSupport
             .appendingPathComponent("Saldo", isDirectory: true)
             .appendingPathComponent("Grails", isDirectory: true)
