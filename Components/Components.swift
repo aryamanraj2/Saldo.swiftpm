@@ -492,6 +492,7 @@ struct WeeklySpendCard: View {
 // MARK: - Action Button
 struct GrailPreviewItem: Identifiable {
     let id: UUID
+    let visualCacheKey: String
     let name: String
     let category: GrailCategory
     let image: UIImage?
@@ -504,13 +505,16 @@ struct GrailPreviewItem: Identifiable {
     }
 }
 
-@MainActor
 enum GrailContourRenderer {
-    private static let cache = NSCache<NSString, UIImage>()
+    private static let cache = ContourImageCache()
 
     static func dashedContour(for image: UIImage, color: UIColor) -> UIImage? {
-        guard let cacheKey = cacheKey(for: image, color: color) else { return nil }
-        if let cached = cache.object(forKey: cacheKey) {
+        dashedContour(for: image, cacheID: fallbackCacheID(for: image), color: color)
+    }
+
+    static func dashedContour(for image: UIImage, cacheID: String, color: UIColor) -> UIImage? {
+        let cacheKey = cacheKey(for: cacheID, color: color)
+        if let cached = cache.image(forKey: cacheKey) {
             return cached
         }
 
@@ -632,15 +636,44 @@ enum GrailContourRenderer {
         }
         
         let rendered = UIImage(cgImage: cgOutput, scale: image.scale, orientation: .up)
-        cache.setObject(rendered, forKey: cacheKey)
+        cache.setImage(rendered, forKey: cacheKey)
         return rendered
     }
 
-    private static func cacheKey(for image: UIImage, color: UIColor) -> NSString? {
-        guard let data = image.pngData() else { return nil }
+    static func warmCache(for image: UIImage, cacheID: String, colors: [UIColor]) {
+        for color in colors {
+            _ = dashedContour(for: image, cacheID: cacheID, color: color)
+        }
+    }
+
+    private static func cacheKey(for cacheID: String, color: UIColor) -> NSString {
         let rgba = color.rgbaComponents
-        let key = "\(data.hashValue)-\(rgba.r)-\(rgba.g)-\(rgba.b)-\(rgba.a)"
+        let key = "\(cacheID)-\(rgba.r)-\(rgba.g)-\(rgba.b)-\(rgba.a)"
         return key as NSString
+    }
+
+    private static func fallbackCacheID(for image: UIImage) -> String {
+        if let cgImage = image.cgImage {
+            return "cg-\(cgImage.width)x\(cgImage.height)-\(Unmanaged.passUnretained(cgImage).toOpaque())"
+        }
+        return "ui-\(ObjectIdentifier(image))"
+    }
+
+    private final class ContourImageCache: @unchecked Sendable {
+        private let storage = NSCache<NSString, UIImage>()
+        private let lock = NSLock()
+
+        func image(forKey key: NSString) -> UIImage? {
+            lock.lock()
+            defer { lock.unlock() }
+            return storage.object(forKey: key)
+        }
+
+        func setImage(_ image: UIImage, forKey key: NSString) {
+            lock.lock()
+            storage.setObject(image, forKey: key)
+            lock.unlock()
+        }
     }
 }
 
@@ -748,6 +781,7 @@ struct GrailSwipeGalleryView: View {
                 
                 if let contour = GrailContourRenderer.dashedContour(
                     for: image,
+                    cacheID: preview.visualCacheKey,
                     color: UIColor(colors.accent)
                 ) {
                     Image(uiImage: contour)
