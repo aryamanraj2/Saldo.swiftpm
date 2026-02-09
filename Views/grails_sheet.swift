@@ -662,13 +662,13 @@ struct GrailImagePicker: UIViewControllerRepresentable {
             
             if provider.canLoadObject(ofClass: UIImage.self) {
                 provider.loadObject(ofClass: UIImage.self) { object, _ in
-                    let imageData = (object as? UIImage)?.pngData()
-                    Task { @MainActor in
-                        guard let imageData,
-                              let image = UIImage(data: imageData) else {
+                    guard let image = object as? UIImage else {
+                        DispatchQueue.main.async {
                             self.onLoadFailure?()
-                            return
                         }
+                        return
+                    }
+                    DispatchQueue.main.async {
                         self.onImagePicked(image)
                     }
                 }
@@ -678,12 +678,14 @@ struct GrailImagePicker: UIViewControllerRepresentable {
             if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
                 provider.loadDataRepresentation(forTypeIdentifier: UTType.image.identifier) { data, _ in
                     let imageData = data
-                    Task { @MainActor in
-                        guard let imageData,
-                              let image = UIImage(data: imageData) else {
+                    guard let imageData,
+                          let image = UIImage(data: imageData) else {
+                        DispatchQueue.main.async {
                             self.onLoadFailure?()
-                            return
                         }
+                        return
+                    }
+                    DispatchQueue.main.async {
                         self.onImagePicked(image)
                     }
                 }
