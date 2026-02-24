@@ -17,9 +17,10 @@ struct HomeView: View {
     @State private var showResultSheet = false
     @State private var showErrorAlert = false
     
-    // Sheet States (Separate for Grails and Subscriptions)
+    // Sheet States (Separate for Grails, Subscriptions, and Manual Payment)
     @State private var showGrailsSheet = false
     @State private var showAddSubscriptionSheet = false
+    @State private var showManualPaymentSheet = false
     
     // Subscription Data
     @State private var subscriptions: [SubscriptionItem] = []
@@ -216,6 +217,14 @@ struct HomeView: View {
                 selectedDetent: $sheetDetent,
                 showSheet: $showScannerSheet,
                 subscriptions: subscriptions,
+                onAddPayment: {
+                    withAnimation(.easeOut(duration: 0.25)) {
+                        showScannerSheet = false
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        showManualPaymentSheet = true
+                    }
+                },
                 onAddSubscription: {
                     // Dismiss scanner sheet with animation, then show add subscription sheet
                     withAnimation(.easeOut(duration: 0.25)) {
@@ -271,6 +280,16 @@ struct HomeView: View {
             AddSubscriptionSheet(colors: colors) { newSubscription in
                 subscriptions.append(newSubscription)
             }
+        }
+        // Manual Payment Sheet
+        .sheet(isPresented: $showManualPaymentSheet, onDismiss: {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                withAnimation(.easeOut(duration: 0.3)) {
+                    showScannerSheet = true
+                }
+            }
+        }) {
+            ManualPaymentSheet(colors: colors, balance: $balance)
         }
         // Processing Overlay
         .overlay {

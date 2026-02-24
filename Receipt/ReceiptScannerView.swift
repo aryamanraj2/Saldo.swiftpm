@@ -33,6 +33,9 @@ struct ScannerSheetContainer: View {
     // Subscription data to display
     var subscriptions: [SubscriptionItem] = []
     
+    // Callback for manual payment entry
+    var onAddPayment: (() -> Void)? = nil
+
     // Callback for adding subscription from the expanded sheet
     var onAddSubscription: (() -> Void)? = nil
     
@@ -60,6 +63,7 @@ struct ScannerSheetContainer: View {
                                 print("[Scanner] Document scanning not supported on this device")
                             }
                         },
+                        onAddPaymentTap: onAddPayment,
                         onAddSubscription: onAddSubscription
                     )
                     // Read the Sheet's Geometry
@@ -112,12 +116,13 @@ struct ScannerSheetContent: View {
     @Binding var selectedDetent: PresentationDetent
     var subscriptions: [SubscriptionItem] = []
     var onScanTap: () -> Void
+    var onAddPaymentTap: (() -> Void)? = nil
     var onAddSubscription: (() -> Void)? = nil
-    
+
     var body: some View {
         VStack(spacing: 0) {
             // MARK: - Floating Search Bar (Always Visible - Like Apple Maps)
-            FloatingScanBar(colors: colors, onScanTap: onScanTap)
+            FloatingScanBar(colors: colors, onScanTap: onScanTap, onAddPaymentTap: onAddPaymentTap ?? {})
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
                 .padding(.bottom, selectedDetent == .scannerSmall ? 12 : 16)
@@ -138,51 +143,84 @@ struct ScannerSheetContent: View {
     }
 }
 
-// MARK: - Floating Scan Bar (Apple Maps Style Pill)
+// MARK: - Floating Scan Bar (Apple Maps Style Pill — Split 70/30)
 struct FloatingScanBar: View {
     var colors: ThemeColors
     var onScanTap: () -> Void
-    
+    var onAddPaymentTap: () -> Void
+
     var body: some View {
-        Button(action: onScanTap) {
-            HStack(spacing: 12) {
-                // Camera icon with accent background
-                ZStack {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(colors.accent.opacity(0.12))
-                        .frame(width: 36, height: 36)
-                    
-                    Image(systemName: "camera.fill")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(colors.accent)
+        HStack(spacing: 8) {
+            // MARK: Scan Receipt — 70%
+            Button(action: onScanTap) {
+                HStack(spacing: 10) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(colors.accent.opacity(0.12))
+                            .frame(width: 34, height: 34)
+
+                        Image(systemName: "camera.fill")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(colors.accent)
+                    }
+
+                    Text("Scan Receipt")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Color.saldoPrimary)
+
+                    Spacer(minLength: 0)
+
+                    Image(systemName: "doc.text.viewfinder")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundStyle(Color.saldoSecondary.opacity(0.5))
                 }
-                
-                Text("Scan Receipt")
-                    .font(.body)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(Color.saldoPrimary)
-                
-                Spacer()
-                
-                // Document viewfinder icon
-                Image(systemName: "doc.text.viewfinder")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(Color.saldoSecondary.opacity(0.6))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .frame(height: 56)
+                .frame(maxWidth: .infinity)
+                .background(
+                    Capsule()
+                        .fill(.ultraThinMaterial)
+                        .overlay(
+                            Capsule()
+                                .strokeBorder(.white.opacity(0.3), lineWidth: 0.5)
+                        )
+                        .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 6)
+                )
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .frame(height: 56)
-            .background(
-                Capsule()
-                    .fill(.ultraThinMaterial)
-                    .overlay(
-                        Capsule()
-                            .strokeBorder(.white.opacity(0.3), lineWidth: 0.5)
-                    )
-                    .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
-            )
+            .buttonStyle(FloatingSheetButtonStyle())
+            .layoutPriority(1)
+
+            // MARK: Add Payment — 30%
+            Button(action: onAddPaymentTap) {
+                HStack(spacing: 6) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundStyle(colors.accent)
+
+                    Text("Add")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(Color.saldoPrimary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .frame(height: 56)
+                .frame(maxWidth: .infinity)
+                .background(
+                    Capsule()
+                        .fill(.ultraThinMaterial)
+                        .overlay(
+                            Capsule()
+                                .strokeBorder(.white.opacity(0.3), lineWidth: 0.5)
+                        )
+                        .shadow(color: .black.opacity(0.15), radius: 12, x: 0, y: 6)
+                )
+            }
+            .buttonStyle(FloatingSheetButtonStyle())
+            .frame(width: UIScreen.main.bounds.width * 0.26)
         }
-        .buttonStyle(FloatingSheetButtonStyle())
     }
 }
 
