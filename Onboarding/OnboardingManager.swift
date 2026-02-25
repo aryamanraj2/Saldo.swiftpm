@@ -14,6 +14,8 @@ class OnboardingManager {
         static let userAllowance = "userAllowance"
         static let userSpending = "userSpending"
         static let userBalance = "userBalance"
+        static let allowanceDay = "allowanceDay"
+        static let grailAllocations = "grailAllocations"
     }
 
     // Properties for SwiftUI observation (no @Published needed with @Observable)
@@ -46,7 +48,29 @@ class OnboardingManager {
             UserDefaults.standard.set(userBalance, forKey: Keys.userBalance)
         }
     }
-    
+
+    var allowanceDay: Int {
+        didSet {
+            UserDefaults.standard.set(allowanceDay, forKey: Keys.allowanceDay)
+        }
+    }
+
+    var grailAllocations: [String: Int] {
+        didSet {
+            if let data = try? JSONEncoder().encode(grailAllocations) {
+                UserDefaults.standard.set(data, forKey: Keys.grailAllocations)
+            }
+        }
+    }
+
+    func allocation(for grailID: UUID) -> Int {
+        grailAllocations[grailID.uuidString] ?? 0
+    }
+
+    func setAllocation(_ percent: Int, for grailID: UUID) {
+        grailAllocations[grailID.uuidString] = percent
+    }
+
     // Computed property for initial balance to use in HomeView
     var initialBalance: Double {
         Double(userBalance)
@@ -63,6 +87,16 @@ class OnboardingManager {
         self.userAllowance = UserDefaults.standard.integer(forKey: Keys.userAllowance)
         self.userSpending = UserDefaults.standard.integer(forKey: Keys.userSpending)
         self.userBalance = UserDefaults.standard.integer(forKey: Keys.userBalance)
+
+        let storedDay = UserDefaults.standard.integer(forKey: Keys.allowanceDay)
+        self.allowanceDay = storedDay > 0 ? storedDay : 1
+
+        if let data = UserDefaults.standard.data(forKey: Keys.grailAllocations),
+           let decoded = try? JSONDecoder().decode([String: Int].self, from: data) {
+            self.grailAllocations = decoded
+        } else {
+            self.grailAllocations = [:]
+        }
     }
 
     // Reset onboarding for testing
@@ -72,5 +106,7 @@ class OnboardingManager {
         userAllowance = 0
         userSpending = 0
         userBalance = 0
+        allowanceDay = 1
+        grailAllocations = [:]
     }
 }

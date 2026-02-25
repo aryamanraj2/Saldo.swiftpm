@@ -21,6 +21,7 @@ struct HomeView: View {
     @State private var showGrailsSheet = false
     @State private var showAddSubscriptionSheet = false
     @State private var showManualPaymentSheet = false
+    @State private var showProfileSheet = false
     @State private var showGrailLimitAlert = false
     
     // Subscription Data
@@ -167,16 +168,22 @@ struct HomeView: View {
             .animation(.easeInOut(duration: 0.5), value: theme)
                 .appStoreStyleToolbar(
                     triggerOffset: 60,
-                    beforeTrailing: { 
-                        Button(action: {}) {
+                    beforeTrailing: {
+                        Button {
+                            withAnimation(.easeOut(duration: 0.25)) { showScannerSheet = false }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { showProfileSheet = true }
+                        } label: {
                             Image(systemName: "person.crop.circle.fill")
                                 .font(.title3)
                                 .foregroundStyle(colors.primary)
                         }
                         .accessibilityLabel("Profile")
                     },
-                    afterTrailing: { 
-                        Button(action: {}) {
+                    afterTrailing: {
+                        Button {
+                            withAnimation(.easeOut(duration: 0.25)) { showScannerSheet = false }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { showProfileSheet = true }
+                        } label: {
                             Image(systemName: "person.crop.circle.fill")
                                 .font(.title3)
                                 .foregroundStyle(colors.primary)
@@ -301,6 +308,16 @@ struct HomeView: View {
             }
         }) {
             ManualPaymentSheet(colors: colors, balance: $balance)
+        }
+        // Profile Sheet
+        .sheet(isPresented: $showProfileSheet, onDismiss: {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                withAnimation(.easeOut(duration: 0.3)) {
+                    showScannerSheet = true
+                }
+            }
+        }) {
+            ProfileSheet(colors: colors, grailPreviews: grailStore.cachedPreviewItems)
         }
         // Processing Overlay
         .overlay {
