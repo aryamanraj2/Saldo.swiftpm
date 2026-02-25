@@ -715,9 +715,12 @@ struct GrailSwipeGalleryView: View {
     var previews: [GrailPreviewItem]
     var colors: ThemeColors
     @Binding var selectedIndex: Int
+    var addIcon: String
 
     var body: some View {
-        let slides = Array(previews.prefix(10))
+        let slides = Array(previews.prefix(3))
+        let showAddSlide = slides.count < 3
+        let totalSlides = slides.count + (showAddSlide ? 1 : 0)
         
         VStack(spacing: 6) {
             TabView(selection: $selectedIndex) {
@@ -743,13 +746,32 @@ struct GrailSwipeGalleryView: View {
                     .padding(.top, 2)
                     .tag(index)
                 }
+                
+                if showAddSlide {
+                    VStack(spacing: 8) {
+                        Spacer(minLength: 0)
+                        Image(systemName: addIcon)
+                            .font(.system(size: 40, weight: .semibold))
+                            .foregroundStyle(colors.primary)
+                            .padding(.bottom, 4)
+                        
+                        Text("Add your grails")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundStyle(colors.secondary)
+                        Spacer(minLength: 0)
+                    }
+                    .frame(height: 196) // Match the content height
+                    .padding(.top, 2)
+                    .tag(slides.count)
+                }
             }
             .frame(height: 196)
             .tabViewStyle(.page(indexDisplayMode: .never))
             
-            if slides.count > 1 {
+            if totalSlides > 1 {
                 HStack(spacing: 5) {
-                    ForEach(0..<slides.count, id: \.self) { index in
+                    ForEach(0..<totalSlides, id: \.self) { index in
                         Circle()
                             .fill(index == selectedIndex ? colors.accent : Color.saldoSecondary.opacity(0.25))
                             .frame(width: index == selectedIndex ? 7 : 6, height: index == selectedIndex ? 7 : 6)
@@ -817,27 +839,51 @@ struct ActionButton: View {
     var body: some View {
         VStack(spacing: 0) {
             if grailPreviews.isEmpty {
-                Image(systemName: icon)
-                    .font(.system(size: 40, weight: .semibold))
-                    .foregroundStyle(colors.primary)
+                VStack(spacing: 8) {
+                    Image(systemName: icon)
+                        .font(.system(size: 40, weight: .semibold))
+                        .foregroundStyle(colors.primary)
+                    
+                    Text("Add your grails")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundStyle(colors.secondary)
+                }
+                .padding()
             } else {
                 GrailSwipeGalleryView(
                     previews: grailPreviews,
                     colors: colors,
-                    selectedIndex: $selectedIndex
+                    selectedIndex: $selectedIndex,
+                    addIcon: icon
                 )
+                .padding(.vertical, 16) // Keep some vertical padding to avoid clipping top/bottom
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
         .liquidGlass(cornerRadius: 20, material: .regular, shadowColor: colors.accent)
+        .overlay(alignment: .topLeading) {
+            if !grailPreviews.isEmpty {
+                let maxSlides = min(grailPreviews.count + (grailPreviews.count < 3 ? 1 : 0), 3)
+                if maxSlides > 1 {
+                    Text("\(selectedIndex + 1)/\(maxSlides)")
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundStyle(colors.secondary.opacity(0.8))
+                        .padding(.top, 14)
+                        .padding(.leading, 14)
+                }
+            }
+        }
         .contentShape(.rect(cornerRadius: 20))
         .onTapGesture(perform: action)
         .onChange(of: grailPreviews.count) { _, newCount in
             if newCount == 0 {
                 selectedIndex = 0
-            } else if selectedIndex >= newCount {
-                selectedIndex = newCount - 1
+            } else {
+                let totalSlides = min(newCount + (newCount < 3 ? 1 : 0), 3)
+                if selectedIndex >= totalSlides {
+                    selectedIndex = totalSlides - 1
+                }
             }
         }
     }

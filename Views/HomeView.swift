@@ -21,6 +21,7 @@ struct HomeView: View {
     @State private var showGrailsSheet = false
     @State private var showAddSubscriptionSheet = false
     @State private var showManualPaymentSheet = false
+    @State private var showGrailLimitAlert = false
     
     // Subscription Data
     @State private var subscriptions: [SubscriptionItem] = []
@@ -92,12 +93,16 @@ struct HomeView: View {
                                     colors: colors,
                                     grailPreviews: grailStore.cachedPreviewItems,
                                     action: {
-                                        // Dismiss scanner sheet with animation, then show grails sheet
-                                        withAnimation(.easeOut(duration: 0.25)) {
-                                            showScannerSheet = false
-                                        }
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                                            showGrailsSheet = true
+                                        if grailStore.cachedPreviewItems.count >= 3 {
+                                            showGrailLimitAlert = true
+                                        } else {
+                                            // Dismiss scanner sheet with animation, then show grails sheet
+                                            withAnimation(.easeOut(duration: 0.25)) {
+                                                showScannerSheet = false
+                                            }
+                                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                                                showGrailsSheet = true
+                                            }
                                         }
                                     }
                                 )
@@ -252,6 +257,12 @@ struct HomeView: View {
             }
         } message: {
             Text(scanError?.localizedDescription ?? "Unknown error occurred")
+        }
+        // Grail Limit Alert
+        .alert("Grail Limit Reached", isPresented: $showGrailLimitAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text("You can only track up to 3 grails at a time.")
         }
         // Grails Sheet (for Add Grails button)
         .sheet(isPresented: $showGrailsSheet, onDismiss: {
