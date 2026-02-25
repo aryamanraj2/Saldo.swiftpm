@@ -1,5 +1,20 @@
 import SwiftUI
 
+// MARK: - Transaction Type
+enum TransactionType: String, CaseIterable, Identifiable {
+    case expense = "Payment"
+    case income = "Received"
+
+    var id: String { rawValue }
+
+    var iconName: String {
+        switch self {
+        case .expense: return "arrow.up.right"
+        case .income: return "arrow.down.left"
+        }
+    }
+}
+
 // MARK: - Manual Payment Sheet
 struct ManualPaymentSheet: View {
     @Environment(\.dismiss) private var dismiss
@@ -11,6 +26,7 @@ struct ManualPaymentSheet: View {
     @State private var amount: String = ""
     @State private var selectedCurrency: CurrencyOption = CurrencyOption.options[0]
     @State private var selectedCategory: PaymentCategory = .food
+    @State private var transactionType: TransactionType = .expense
 
     @FocusState private var isNameFocused: Bool
     @FocusState private var isAmountFocused: Bool
@@ -22,7 +38,7 @@ struct ManualPaymentSheet: View {
     var body: some View {
         VStack(spacing: 0) {
             // MARK: - Header
-            ManualPaymentSheetHeader(colors: colors, onCancel: { dismiss() })
+            ManualPaymentSheetHeader(colors: colors, transactionType: transactionType, onCancel: { dismiss() })
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
                 .padding(.bottom, 20)
@@ -96,12 +112,12 @@ struct ManualPaymentSheet: View {
                     VStack(spacing: 20) {
                         // Merchant Name
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("Paid to")
+                            Text(transactionType == .expense ? "Paid to" : "Received from")
                                 .font(.subheadline)
                                 .fontWeight(.semibold)
                                 .foregroundStyle(Color.saldoPrimary)
 
-                            TextField("e.g., Swiggy, Amazon", text: $merchantName)
+                            TextField(transactionType == .expense ? "e.g., Swiggy, Amazon" : "e.g., John, Salary", text: $merchantName)
                                 .font(.body)
                                 .foregroundStyle(Color.saldoPrimary)
                                 .padding(.horizontal, 16)
@@ -182,19 +198,36 @@ struct ManualPaymentSheet: View {
                                     .frame(maxWidth: .infinity)
                             }
                         }
+
+                        // Transaction Type (Liquid Glass Slider)
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Transaction Type")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundStyle(Color.saldoPrimary)
+                            
+                            LiquidGlassTransactionTypePicker(
+                                selection: $transactionType,
+                                colors: colors
+                            )
+                        }
                     }
                     .padding(.horizontal, 20)
 
                     // Save Button
                     Button {
                         guard let value = Double(amount) else { return }
-                        balance -= value
+                        if transactionType == .expense {
+                            balance -= value
+                        } else {
+                            balance += value
+                        }
                         dismiss()
                     } label: {
                         HStack(spacing: 8) {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 18, weight: .semibold))
-                            Text("Add Payment")
+                            Text(transactionType == .expense ? "Add Payment" : "Add Received")
                                 .font(.body)
                                 .fontWeight(.semibold)
                         }
@@ -229,6 +262,72 @@ struct ManualPaymentSheet: View {
     }
 }
 
+// MARK: - Liquid Glass Transaction Type Picker
+struct LiquidGlassTransactionTypePicker: View {
+    @Binding var selection: TransactionType
+    var colors: ThemeColors
+    @Namespace private var namespace
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(TransactionType.allCases) { type in
+                Button {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                        selection = type
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: type.iconName)
+                            .font(.system(size: 16, weight: .semibold))
+                            .symbolEffect(.bounce, value: selection == type)
+                        
+                        Text(type.rawValue)
+                            .font(.subheadline)
+                            .fontWeight(.bold)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(selection == type ? Color.white : Color.saldoPrimary.opacity(0.5))
+                .background {
+                    if selection == type {
+                        ZStack {
+                            if #available(iOS 26, *) {
+                                Color.clear
+                                    .glassEffect(.regular.interactive().tint(colors.accent.opacity(0.8)), in: .rect(cornerRadius: 16))
+                                    .matchedGeometryEffect(id: "selection", in: namespace)
+                            } else {
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .fill(colors.accent)
+                                    .matchedGeometryEffect(id: "selection", in: namespace)
+                                    .liquidGlass(cornerRadius: 16, material: .regular, shadowColor: colors.accent)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(6)
+        .background {
+            ZStack {
+                if #available(iOS 26, *) {
+                    Color.clear
+                        .glassEffect(.regular, in: .rect(cornerRadius: 22))
+                } else {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .fill(Color.saldoSecondary.opacity(0.06))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                                .strokeBorder(Color.saldoSecondary.opacity(0.1), lineWidth: 1)
+                        )
+                }
+            }
+        }
+    }
+}
+
 // MARK: - Payment Categories
 enum PaymentCategory: String, CaseIterable, Identifiable {
     case food = "Food"
@@ -257,6 +356,7 @@ enum PaymentCategory: String, CaseIterable, Identifiable {
 // MARK: - Header
 private struct ManualPaymentSheetHeader: View {
     var colors: ThemeColors
+    var transactionType: TransactionType
     var onCancel: () -> Void
 
     var body: some View {
@@ -280,12 +380,12 @@ private struct ManualPaymentSheetHeader: View {
                         .fill(colors.accent.opacity(0.12))
                         .frame(width: 32, height: 32)
 
-                    Image(systemName: "plus.circle.fill")
+                    Image(systemName: transactionType == .expense ? "plus.circle.fill" : "arrow.down.circle.fill")
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(colors.accent)
                 }
 
-                Text("Add Payment")
+                Text(transactionType == .expense ? "Add Payment" : "Add Received")
                     .font(.body)
                     .fontWeight(.semibold)
                     .foregroundStyle(Color.saldoPrimary)
