@@ -4,12 +4,18 @@ struct TransactionItem: Identifiable {
     let id = UUID()
     let icon: String
     let title: String
-    let subtitle: String
+    let date: Date
     let amount: Double
     let type: TransactionType
     
     enum TransactionType {
         case expense, income
+    }
+    
+    var subtitle: String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return formatter.localizedString(for: date, relativeTo: Date())
     }
     
     var formattedAmount: String {
@@ -25,42 +31,54 @@ struct TransactionItem: Identifiable {
     }
 }
 
+enum SortOption: String, CaseIterable, Identifiable {
+    case dateNewest = "Date (Newest)"
+    case dateOldest = "Date (Oldest)"
+    case amountHighest = "Amount (Highest)"
+    case amountLowest = "Amount (Lowest)"
+    
+    var id: String { rawValue }
+}
+
+enum FilterOption: String, CaseIterable, Identifiable {
+    case all = "All"
+    case expenses = "Expenses"
+    case income = "Income"
+    
+    var id: String { rawValue }
+}
+
 struct AllTransactionsView: View {
     var colors: ThemeColors
     @Environment(\.colorScheme) private var colorScheme
     @State private var searchText = ""
-    @State private var selectedFilter: FilterType = .all
+    @State private var selectedFilter: FilterOption = .all
+    @State private var selectedSort: SortOption = .dateNewest
     
-    enum FilterType: String, CaseIterable {
-        case all = "All"
-        case expenses = "Expenses"
-        case income = "Income"
-    }
-    
-    // Mock data based on the original HomeView
+    // Mock data based on the original HomeView with actual Date objects
     @State private var transactions: [TransactionItem] = [
-        TransactionItem(icon: "basket.fill", title: "Grocery", subtitle: "Today, 5:30 PM", amount: 450.00, type: .expense),
-        TransactionItem(icon: "music.note", title: "Spotify", subtitle: "Yesterday", amount: 119.00, type: .expense),
-        TransactionItem(icon: "cup.and.saucer.fill", title: "Starbucks", subtitle: "Yesterday", amount: 350.00, type: .expense),
-        TransactionItem(icon: "gamecontroller.fill", title: "Steam", subtitle: "2 days ago", amount: 899.00, type: .expense),
-        TransactionItem(icon: "briefcase.fill", title: "Salary", subtitle: "5 days ago", amount: 125000.00, type: .income),
-        TransactionItem(icon: "car.fill", title: "Uber", subtitle: "1 week ago", amount: 250.00, type: .expense),
-        TransactionItem(icon: "film.fill", title: "Netflix", subtitle: "1 week ago", amount: 199.00, type: .expense),
-        TransactionItem(icon: "fork.knife", title: "Dinner", subtitle: "2 weeks ago", amount: 1200.00, type: .expense),
-        TransactionItem(icon: "dollarsign.arrow.circlepath", title: "Refund", subtitle: "2 weeks ago", amount: 450.00, type: .income)
+        TransactionItem(icon: "basket.fill", title: "Grocery", date: Calendar.current.date(byAdding: .hour, value: -2, to: Date())!, amount: 450.00, type: .expense),
+        TransactionItem(icon: "music.note", title: "Spotify", date: Calendar.current.date(byAdding: .day, value: -1, to: Date())!, amount: 119.00, type: .expense),
+        TransactionItem(icon: "cup.and.saucer.fill", title: "Starbucks", date: Calendar.current.date(byAdding: .day, value: -1, to: Date())!, amount: 350.00, type: .expense),
+        TransactionItem(icon: "gamecontroller.fill", title: "Steam", date: Calendar.current.date(byAdding: .day, value: -2, to: Date())!, amount: 899.00, type: .expense),
+        TransactionItem(icon: "briefcase.fill", title: "Salary", date: Calendar.current.date(byAdding: .day, value: -5, to: Date())!, amount: 125000.00, type: .income),
+        TransactionItem(icon: "car.fill", title: "Uber", date: Calendar.current.date(byAdding: .day, value: -7, to: Date())!, amount: 250.00, type: .expense),
+        TransactionItem(icon: "film.fill", title: "Netflix", date: Calendar.current.date(byAdding: .day, value: -7, to: Date())!, amount: 199.00, type: .expense),
+        TransactionItem(icon: "fork.knife", title: "Dinner", date: Calendar.current.date(byAdding: .day, value: -14, to: Date())!, amount: 1200.00, type: .expense),
+        TransactionItem(icon: "dollarsign.arrow.circlepath", title: "Refund", date: Calendar.current.date(byAdding: .day, value: -14, to: Date())!, amount: 450.00, type: .income)
     ]
     
-    var filteredTransactions: [TransactionItem] {
+    var filteredAndSortedTransactions: [TransactionItem] {
         var result = transactions
         
-        // Apply filter
+        // 1. Filter
         switch selectedFilter {
         case .all: break
         case .expenses: result = result.filter { $0.type == .expense }
         case .income: result = result.filter { $0.type == .income }
         }
         
-        // Apply search
+        // 2. Search
         if !searchText.isEmpty {
             result = result.filter { 
                 $0.title.localizedStandardContains(searchText) ||
@@ -68,7 +86,23 @@ struct AllTransactionsView: View {
             }
         }
         
+        // 3. Sort
+        switch selectedSort {
+        case .dateNewest:
+            result.sort { $0.date > $1.date }
+        case .dateOldest:
+            result.sort { $0.date < $1.date }
+        case .amountHighest:
+            result.sort { $0.amount > $1.amount }
+        case .amountLowest:
+            result.sort { $0.amount < $1.amount }
+        }
+        
         return result
+    }
+    
+    var isFilteredOrSorted: Bool {
+        selectedFilter != .all || selectedSort != .dateNewest
     }
     
     var body: some View {
@@ -77,53 +111,109 @@ struct AllTransactionsView: View {
                 .ignoresSafeArea()
             
             ScrollView {
-                VStack(spacing: 20) {
-                    // Filters
-                    Picker("Filter", selection: $selectedFilter) {
-                        ForEach(FilterType.allCases, id: \.self) { type in
-                            Text(type.rawValue).tag(type)
+                VStack(spacing: 12) {
+                    // Floating Liquid Glass Search Bar
+                    HStack {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundStyle(colors.primary.opacity(0.7))
+                        
+                        TextField("Search transactions", text: $searchText)
+                            .font(.body)
+                            .foregroundStyle(colors.primary)
+                            .submitLabel(.search)
+                        
+                        if !searchText.isEmpty {
+                            Button {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                    searchText = ""
+                                }
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 16))
+                                    .foregroundStyle(colors.primary.opacity(0.5))
+                            }
+                            .transition(.scale.combined(with: .opacity))
                         }
                     }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 10)
-                    
-                    // Transactions List
-                    VStack(spacing: 12) {
-                        if filteredTransactions.isEmpty {
-                            VStack(spacing: 12) {
-                                Image(systemName: "magnifyingglass")
-                                    .font(.system(size: 40))
-                                    .foregroundStyle(Color.saldoSecondary)
-                                    .padding(.top, 40)
-                                Text("No transactions found")
-                                    .font(.headline)
-                                    .foregroundStyle(colors.primary)
-                                Text("Try a different search or filter.")
-                                    .font(.subheadline)
-                                    .foregroundStyle(Color.saldoSecondary)
-                            }
-                            .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                    // Liquid Glass Styling
+                    .background {
+                        if #available(iOS 26, *) {
+                            Color.clear
+                                .glassEffect(.regular, in: .rect(cornerRadius: 24, style: .continuous))
                         } else {
-                            ForEach(filteredTransactions) { transaction in
-                                TransactionRow(
-                                    icon: transaction.icon,
-                                    title: transaction.title,
-                                    subtitle: transaction.subtitle,
-                                    amount: transaction.formattedAmount,
-                                    colors: colors
-                                )
-                            }
+                            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                                .fill(.ultraThinMaterial)
+                                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.3 : 0.05), radius: 10, x: 0, y: 4)
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                                        .stroke(Color.white.opacity(colorScheme == .dark ? 0.1 : 0.4), lineWidth: 1)
+                                }
                         }
                     }
                     .padding(.horizontal, 20)
-                    .padding(.bottom, 40)
+                    .padding(.top, 12)
+                    .padding(.bottom, 8)
+
+                    if filteredAndSortedTransactions.isEmpty {
+                        VStack(spacing: 12) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 40))
+                                .foregroundStyle(Color.saldoSecondary)
+                                .padding(.top, 40)
+                            Text("No transactions found")
+                                .font(.headline)
+                                .foregroundStyle(colors.primary)
+                            Text("Try a different search or filter.")
+                                .font(.subheadline)
+                                .foregroundStyle(Color.saldoSecondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                    } else {
+                        ForEach(filteredAndSortedTransactions) { transaction in
+                            TransactionRow(
+                                icon: transaction.icon,
+                                title: transaction.title,
+                                subtitle: transaction.subtitle,
+                                amount: transaction.formattedAmount,
+                                colors: colors
+                            )
+                        }
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 20)
+                .padding(.bottom, 40)
+            }
+        }
+        .navigationTitle("All Transactions")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Section("Sort By") {
+                        Picker("Sort By", selection: $selectedSort) {
+                            ForEach(SortOption.allCases) { option in
+                                Text(option.rawValue).tag(option)
+                            }
+                        }
+                    }
+                    
+                    Section("Filter By Type") {
+                        Picker("Filter By Type", selection: $selectedFilter) {
+                            ForEach(FilterOption.allCases) { option in
+                                Text(option.rawValue).tag(option)
+                            }
+                        }
+                    }
+                } label: {
+                    Image(systemName: isFilteredOrSorted ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                        .foregroundStyle(isFilteredOrSorted ? colors.accent : colors.primary)
                 }
             }
         }
-        .navigationTitle("Transactions")
-        .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $searchText, prompt: "Search transactions")
         .toolbarBackground(.visible, for: .navigationBar)
         .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
     }
