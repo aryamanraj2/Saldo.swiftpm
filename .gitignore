@@ -65,3 +65,6 @@ fastlane/test_output
 
 # Code Injection
 iOSInjectionProject/
+
+# Markdown files
+*.md

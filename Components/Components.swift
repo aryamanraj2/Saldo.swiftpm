@@ -576,7 +576,7 @@ enum GrailContourRenderer {
         
         // Thicken the real silhouette edge so it stays visible at card-preview sizes.
         var thickEdges = rawEdges
-        let dilationRadius = max(1, Int(round(Double(max(width, height)) * 0.01)))
+        let dilationRadius = max(1, Int(round(Double(max(width, height)) * 0.025)))
         if dilationRadius > 0 {
             for y in 1..<(height - 1) {
                 for x in 1..<(width - 1) {
