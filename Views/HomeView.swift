@@ -122,17 +122,27 @@ struct HomeView: View {
                         
                         // Transactions Section
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Recent Transactions")
-                                .font(.title3)
-                                .fontWeight(.semibold)
-                                .foregroundStyle(colors.primary)
-                                .padding(.horizontal, 20)
+                            NavigationLink(destination: AllTransactionsView(colors: colors)) {
+                                HStack(alignment: .center) {
+                                    Text("Recent Transactions")
+                                        .font(.title3)
+                                        .fontWeight(.semibold)
+                                        .foregroundStyle(colors.primary)
+                                    
+                                    Spacer()
+                                    
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundStyle(Color.saldoSecondary)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.horizontal, 20)
                             
                             VStack(spacing: 8) {
                                 TransactionRow(icon: "basket.fill", title: "Grocery", subtitle: "5:30 PM", amount: "₹450.00", colors: colors)
                                 TransactionRow(icon: "music.note", title: "Spotify", subtitle: "Yesterday", amount: "₹119.00", colors: colors)
                                 TransactionRow(icon: "cup.and.saucer.fill", title: "Starbucks", subtitle: "Yesterday", amount: "₹350.00", colors: colors)
-                                TransactionRow(icon: "gamecontroller.fill", title: "Steam", subtitle: "2 days ago", amount: "₹899.00", colors: colors)
                             }
                             .padding(.horizontal, 20)
                         }
