@@ -16,18 +16,19 @@ struct ProfileSheet: View {
     @FocusState private var isNameFocused: Bool
     @FocusState private var isAmountFocused: Bool
 
-    // Compact DatePicker binding — maps Int day ↔ Date
-    private var dayBinding: Binding<Date> {
-        Binding(
-            get: {
-                var c = Calendar.current.dateComponents([.year, .month], from: Date())
-                c.day = selectedDay
-                return Calendar.current.date(from: c) ?? Date()
-            },
-            set: { newDate in
-                selectedDay = Calendar.current.component(.day, from: newDate)
-            }
-        )
+    private var daysInCurrentMonth: Int {
+        let calendar = Calendar.current
+        let range = calendar.range(of: .day, in: .month, for: Date()) ?? 1..<32
+        return range.count
+    }
+
+    private func daySuffix(for day: Int) -> String {
+        switch day {
+        case 1, 21, 31: return "st"
+        case 2, 22: return "nd"
+        case 3, 23: return "rd"
+        default: return "th"
+        }
     }
 
     private var totalAllocation: Double {
@@ -43,7 +44,7 @@ struct ProfileSheet: View {
         !name.trimmingCharacters(in: .whitespaces).isEmpty
             && !allowance.isEmpty
             && Int(allowance) != nil
-            && (grailPreviews.isEmpty || abs(totalAllocation - 100) < 1)
+            && totalAllocation <= 100
     }
 
     var body: some View {
@@ -120,76 +121,59 @@ struct ProfileSheet: View {
         }
     }
 
-    // MARK: - Day Section — Compact DatePicker (tap → calendar popover)
+    // MARK: - Day Section
 
     private var daySection: some View {
         ProfileSectionCard(colors: colors) {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 10) {
                 SectionLabel(text: "Allowance Day", icon: "calendar", colors: colors)
 
                 Text("Day your allowance arrives every month")
                     .font(.caption)
                     .foregroundStyle(Color.saldoSecondary)
+                    .padding(.bottom, 2)
 
-                // .compact style = small pill label, tap → full calendar overlay pops up
-                // On iOS 26 this gets the Liquid Glass treatment automatically
-                HStack {
+                HStack(spacing: 10) {
                     Image(systemName: "calendar.badge.clock")
-                        .foregroundStyle(colors.accent)
-                        .font(.body)
-
-                    DatePicker(
-                        "",
-                        selection: dayBinding,
-                        displayedComponents: [.date]
-                    )
-                    .labelsHidden()
-                    .datePickerStyle(.compact)
-                    .tint(colors.accent)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .padding(.horizontal, 14).padding(.vertical, 10)
-                .background {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(colors.accent.opacity(0.07))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                .strokeBorder(colors.accent.opacity(0.18), lineWidth: 1)
+                        .font(.title3).fontWeight(.semibold).foregroundStyle(colors.accent)
+                        .frame(width: 44, height: 44)
+                        .background {
+                            if #available(iOS 26, *) {
+                                Color.clear.glassEffect(.regular, in: .rect(cornerRadius: 12))
+                            } else {
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(colors.accent.opacity(0.12))
+                            }
                         }
-                }
 
-                Text("Tap the date to pick a day →")
-                    .font(.caption2)
-                    .foregroundStyle(Color.saldoSecondary.opacity(0.6))
+                    Menu {
+                        Picker("Select Day", selection: $selectedDay) {
+                            ForEach(1...daysInCurrentMonth, id: \.self) { day in
+                                Text("\(day)\(daySuffix(for: day))").tag(day)
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            Text("\(selectedDay)\(daySuffix(for: selectedDay)) of the month")
+                                .font(.title3).fontWeight(.semibold).foregroundStyle(Color.saldoPrimary)
+                            Spacer()
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.subheadline)
+                                .foregroundStyle(Color.saldoSecondary)
+                        }
+                        .padding(.horizontal, 14).padding(.vertical, 12)
+                        .background { GlassBackgroundField(isFocused: false, colors: colors) }
+                        .contentShape(Rectangle())
+                    }
+                }
             }
         }
     }
-
-    // MARK: - Allocation Section
 
     private var allocationSection: some View {
         Group {
             if grailPreviews.isEmpty {
                 EmptyView()
-            } else if grailPreviews.count == 1 {
-                ProfileSectionCard(colors: colors) {
-                    VStack(alignment: .leading, spacing: 10) {
-                        SectionLabel(text: "Savings Split", icon: "chart.pie.fill", colors: colors)
-                        HStack(spacing: 12) {
-                            GrailAllocationThumbnail(
-                                image: grailPreviews[0].image,
-                                category: grailPreviews[0].category,
-                                colors: colors
-                            )
-                            Text(grailPreviews[0].name)
-                                .font(.subheadline).fontWeight(.semibold).foregroundStyle(Color.saldoPrimary)
-                            Spacer()
-                            Text("100%")
-                                .font(.title3).fontWeight(.bold).foregroundStyle(colors.accent)
-                            Image(systemName: "lock.fill").font(.caption2).foregroundStyle(Color.saldoSecondary)
-                        }
-                    }
-                }
             } else {
                 ProfileSectionCard(colors: colors) {
                     SavingsSplitView(
@@ -232,16 +216,15 @@ struct ProfileSheet: View {
         allowance = manager.userAllowance > 0 ? "\(manager.userAllowance)" : ""
         selectedDay = manager.allowanceDay
 
-        if grailPreviews.count == 1 {
-            allocations = [grailPreviews[0].id.uuidString: 100]
-        } else if grailPreviews.count >= 2 {
+        if !grailPreviews.isEmpty {
             var loaded: [String: Double] = [:]
             for grail in grailPreviews {
                 loaded[grail.id.uuidString] = Double(manager.grailAllocations[grail.id.uuidString] ?? 0)
             }
             let sum = loaded.values.reduce(0, +)
-            if sum < 1 {
-                let base = 100.0 / Double(grailPreviews.count)
+            if sum == 0 {
+                // By default allocate something if empty
+                let base = min(100.0 / Double(grailPreviews.count), 50.0).rounded()
                 for grail in grailPreviews { loaded[grail.id.uuidString] = base }
             }
             allocations = loaded
@@ -253,158 +236,78 @@ struct ProfileSheet: View {
         manager.userName = name.trimmingCharacters(in: .whitespaces)
         if let value = Int(allowance) { manager.userAllowance = value }
         manager.allowanceDay = selectedDay
-        if grailPreviews.count >= 2 {
+        if !grailPreviews.isEmpty {
             manager.grailAllocations = intAllocations
-        } else if grailPreviews.count == 1 {
-            manager.grailAllocations = [grailPreviews[0].id.uuidString: 100]
         }
         dismiss()
     }
 }
 
-// MARK: - Savings Split View (Swift Charts SectorMark)
+// MARK: - Savings Split View
 
 struct SavingsSplitView: View {
     let grails: [GrailPreviewItem]
     @Binding var allocations: [String: Double]
     let accentColor: Color
 
-    @State private var selectedGrailID: String? = nil
-    @State private var selectedAngle: Double? = nil
-    @State private var appear: Bool = false
-
     private var totalAllocation: Double {
         allocations.values.reduce(0, +)
     }
 
-    private var allOk: Bool { abs(totalAllocation - 100) < 1 }
+    private var unallocated: Double {
+        max(0, 100.0 - totalAllocation)
+    }
 
-    // Chart data model
+    // Chart data model for the dynamic rendering rows
     struct Slice: Identifiable {
         let id: String
         let name: String
         let value: Double
         let color: Color
-        let category: GrailCategory
+        let category: GrailCategory?
         let image: UIImage?
+        let isGeneral: Bool
     }
 
     private var slices: [Slice] {
-        grails.enumerated().map { i, grail in
+        var items = grails.enumerated().map { i, grail in
             Slice(
                 id: grail.id.uuidString,
                 name: grail.name,
                 value: max(allocations[grail.id.uuidString] ?? 0, 0),
                 color: grailPaletteColor(index: i, accent: accentColor),
                 category: grail.category,
-                image: grail.image
+                image: grail.image,
+                isGeneral: false
             )
         }
+        
+        items.append(
+            Slice(
+                id: "general_savings",
+                name: "General Savings",
+                value: unallocated,
+                color: Color.saldoSecondary,
+                category: nil,
+                image: nil,
+                isGeneral: true
+            )
+        )
+        return items
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
             // Header row
             HStack {
-                SectionLabel(text: "Savings Split", icon: "chart.pie.fill",
+                SectionLabel(text: "Savings Split", icon: "arrow.triangle.branch",
                              colors: ThemeColors(background: .clear, primary: Color.saldoPrimary,
                                                 secondary: Color.saldoSecondary, accent: accentColor,
                                                 backgroundBlob1: .clear, backgroundBlob2: .clear, backgroundBlob3: .clear))
                 Spacer()
-                // Animated total badge
-                HStack(spacing: 4) {
-                    if allOk {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.caption).foregroundStyle(accentColor)
-                            .transition(.scale.combined(with: .opacity))
-                    }
-                    Text("\(Int(totalAllocation.rounded()))%")
-                        .font(.subheadline).fontWeight(.bold)
-                        .foregroundStyle(allOk ? accentColor : .orange)
-                        .contentTransition(.numericText())
-                }
-                .animation(.spring(response: 0.35), value: allOk)
-                .animation(.spring(response: 0.35), value: Int(totalAllocation.rounded()))
-            }
-
-            // Swift Charts donut
-            ZStack {
-                Chart(slices) { slice in
-                    SectorMark(
-                        angle: .value("Pct", slice.value),
-                        innerRadius: .ratio(0.55),
-                        outerRadius: selectedGrailID == slice.id ? .ratio(0.97) : .ratio(0.88),
-                        angularInset: 2.5
-                    )
-                    .cornerRadius(8)
-                    .foregroundStyle(
-                        // Gradient fill per slice
-                        LinearGradient(
-                            colors: [slice.color, slice.color.opacity(0.65)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .opacity(selectedGrailID == nil || selectedGrailID == slice.id ? 1 : 0.45)
-                    .shadow(color: slice.color.opacity(selectedGrailID == slice.id ? 0.45 : 0.15),
-                            radius: selectedGrailID == slice.id ? 12 : 4, x: 0, y: 4)
-                }
-                .chartAngleSelection(value: $selectedAngle)
-                .onChange(of: selectedAngle) { _, newAngle in
-                    if let angle = newAngle {
-                        updateSelectedGrail(for: angle)
-                    } else {
-                        withAnimation(.spring(response: 0.3)) { selectedGrailID = nil }
-                    }
-                }
-                .frame(height: 220)
-                .scaleEffect(appear ? 1 : 0.85)
-                .opacity(appear ? 1 : 0)
-                .animation(.spring(response: 0.55, dampingFraction: 0.75), value: appear)
-
-                // Centre content
-                VStack(spacing: 4) {
-                    if let id = selectedGrailID, let slice = slices.first(where: { $0.id == id }) {
-                        // Show selected grail info
-                        if let img = slice.image {
-                            Image(uiImage: img)
-                                .resizable().scaledToFit()
-                                .frame(width: 32, height: 32)
-                                .transition(.scale.combined(with: .opacity))
-                        } else {
-                            Image(systemName: slice.category.iconName)
-                                .font(.system(size: 22, weight: .semibold))
-                                .foregroundStyle(slice.color)
-                                .transition(.scale.combined(with: .opacity))
-                        }
-                        Text("\(Int(slice.value.rounded()))%")
-                            .font(.system(size: 22, weight: .bold, design: .rounded))
-                            .foregroundStyle(slice.color)
-                            .contentTransition(.numericText())
-                    } else {
-                        // Default centre
-                        Image(systemName: allOk ? "checkmark.circle.fill" : "hand.point.up.left.fill")
-                            .font(.system(size: 24, weight: .semibold))
-                            .foregroundStyle(allOk ? accentColor : Color.saldoSecondary)
-                            .animation(.spring(response: 0.4), value: allOk)
-                        Text(allOk ? "Set!" : "Tap\nsegment")
-                            .font(.system(size: 11, weight: .semibold))
-                            .multilineTextAlignment(.center)
-                            .foregroundStyle(allOk ? accentColor : Color.saldoSecondary)
-                            .animation(.spring(response: 0.4), value: allOk)
-                    }
-                }
-                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: selectedGrailID)
-            }
-
-            // Instruction hint
-            if !allOk {
-                HStack(spacing: 6) {
-                    Image(systemName: "info.circle").font(.caption2)
-                    Text("Adjust values below until total reaches 100%").font(.caption)
-                }
-                .foregroundStyle(Color.orange)
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                Text("100% Total")
+                    .font(.subheadline).fontWeight(.bold)
+                    .foregroundStyle(Color.saldoSecondary)
             }
 
             // Legend + stepper rows
@@ -412,13 +315,7 @@ struct SavingsSplitView: View {
                 ForEach(Array(slices.enumerated()), id: \.element.id) { index, slice in
                     AllocationLegendRow(
                         slice: slice,
-                        isSelected: selectedGrailID == slice.id,
                         accentColor: accentColor,
-                        onTap: {
-                            withAnimation(.spring(response: 0.3)) {
-                                selectedGrailID = selectedGrailID == slice.id ? nil : slice.id
-                            }
-                        },
                         onDecrement: {
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
                                 stepAllocation(grailID: slice.id, delta: -5)
@@ -443,60 +340,18 @@ struct SavingsSplitView: View {
                     .fill(Color.saldoSecondary.opacity(0.04))
             }
         }
-        .onAppear {
-            withAnimation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.1)) {
-                appear = true
-            }
-        }
-    }
-
-    // Convert chart tap angle → selected grail
-    private func updateSelectedGrail(for angle: Double) {
-        var cumAngle = 0.0
-        let total = totalAllocation
-        guard total > 0 else { return }
-        for slice in slices {
-            let sweep = slice.value / total * 360.0
-            cumAngle += sweep
-            if angle <= cumAngle {
-                withAnimation(.spring(response: 0.3)) {
-                    selectedGrailID = slice.id
-                }
-                return
-            }
-        }
-        withAnimation(.spring(response: 0.3)) { selectedGrailID = nil }
     }
 
     private func stepAllocation(grailID: String, delta: Int) {
+        guard grailID != "general_savings" else { return } // General savings is computed
         let current = allocations[grailID] ?? 0
-        let proposed = max(5, min(90, current + Double(delta)))
-        guard proposed != current else { return }
-
-        allocations[grailID] = proposed
-
-        // Redistribute remainder to others proportionally
-        let othersTotal = grails.filter { $0.id.uuidString != grailID }
-            .reduce(0.0) { $0 + (allocations[$1.id.uuidString] ?? 0) }
-        let remaining = 100.0 - proposed
-        let otherIDs = grails.map(\.id.uuidString).filter { $0 != grailID }
-
-        if othersTotal > 0 {
-            var distributed = 0.0
-            for (i, id) in otherIDs.enumerated() {
-                if i == otherIDs.count - 1 {
-                    allocations[id] = max(5, remaining - distributed)
-                } else {
-                    let ratio = (allocations[id] ?? 0) / othersTotal
-                    let share = (ratio * remaining).rounded()
-                    allocations[id] = max(5, share)
-                    distributed += share
-                }
-            }
-        } else {
-            let base = remaining / Double(otherIDs.count)
-            for id in otherIDs { allocations[id] = max(5, base) }
-        }
+        let proposed = max(0, min(100, current + Double(delta)))
+        
+        let available = 100.0 - totalAllocation + current
+        let finalized = min(proposed, available)
+        
+        guard finalized != current else { return }
+        allocations[grailID] = finalized
 
         let generator = UIImpactFeedbackGenerator(style: .light)
         generator.impactOccurred()
@@ -507,9 +362,7 @@ struct SavingsSplitView: View {
 
 private struct AllocationLegendRow: View {
     let slice: SavingsSplitView.Slice
-    let isSelected: Bool
     let accentColor: Color
-    let onTap: () -> Void
     let onDecrement: () -> Void
     let onIncrement: () -> Void
 
@@ -524,75 +377,84 @@ private struct AllocationLegendRow: View {
             // Icon
             ZStack {
                 Circle()
-                    .fill(slice.color.opacity(0.12))
+                    .fill(slice.isGeneral ? Color.saldoSecondary.opacity(0.12) : slice.color.opacity(0.12))
                     .frame(width: 32, height: 32)
                 if let img = slice.image {
                     Image(uiImage: img).resizable().scaledToFit()
                         .frame(width: 24, height: 24)
                 } else {
-                    Image(systemName: slice.category.iconName)
+                    Image(systemName: slice.isGeneral ? "safari.fill" : (slice.category?.iconName ?? "star.fill"))
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(slice.color)
+                        .foregroundStyle(slice.isGeneral ? Color.saldoSecondary : slice.color)
                 }
             }
 
             // Name
             Text(slice.name)
                 .font(.subheadline).fontWeight(.medium)
-                .foregroundStyle(isSelected ? Color.saldoPrimary : Color.saldoSecondary)
+                .foregroundStyle(Color.saldoPrimary)
                 .lineLimit(1)
-                .animation(.spring(response: 0.25), value: isSelected)
 
             Spacer()
 
-            // Stepper
+            // Stepper/Lock
             HStack(spacing: 6) {
-                // Minus
-                Button(action: onDecrement) {
-                    Image(systemName: "minus")
+                if slice.isGeneral {
+                    // Lock icon + value for General Savings
+                    Image(systemName: "lock.fill")
                         .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(slice.value > 5 ? slice.color : Color.saldoSecondary.opacity(0.3))
+                        .foregroundStyle(Color.saldoSecondary.opacity(0.5))
                         .frame(width: 28, height: 28)
-                        .background(
-                            Circle()
-                                .fill(slice.value > 5 ? slice.color.opacity(0.12) : Color.clear)
-                        )
-                }
-                .buttonStyle(.plain)
-                .disabled(slice.value <= 5)
+                        
+                    Text("\(Int(slice.value.rounded()))%")
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.saldoSecondary)
+                        .frame(width: 44, alignment: .center)
+                        .contentTransition(.numericText())
+                        .animation(.spring(response: 0.25), value: Int(slice.value.rounded()))
+                        
+                    Spacer().frame(width: 28) // Balancing space
+                } else {
+                    // Minus
+                    Button(action: onDecrement) {
+                        Image(systemName: "minus")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(slice.value > 0 ? slice.color : Color.saldoSecondary.opacity(0.3))
+                            .frame(width: 28, height: 28)
+                            .background(
+                                Circle()
+                                    .fill(slice.value > 0 ? slice.color.opacity(0.12) : Color.clear)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(slice.value <= 0)
 
-                // Pct badge
-                Text("\(Int(slice.value.rounded()))%")
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(slice.color)
-                    .frame(width: 44, alignment: .center)
-                    .contentTransition(.numericText())
-                    .animation(.spring(response: 0.25), value: Int(slice.value.rounded()))
+                    // Pct badge
+                    Text("\(Int(slice.value.rounded()))%")
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundStyle(slice.color)
+                        .frame(width: 44, alignment: .center)
+                        .contentTransition(.numericText())
+                        .animation(.spring(response: 0.25), value: Int(slice.value.rounded()))
 
-                // Plus
-                Button(action: onIncrement) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(slice.value < 90 ? slice.color : Color.saldoSecondary.opacity(0.3))
-                        .frame(width: 28, height: 28)
-                        .background(
-                            Circle()
-                                .fill(slice.value < 90 ? slice.color.opacity(0.12) : Color.clear)
-                        )
+                    // Plus
+                    Button(action: onIncrement) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundStyle(slice.value < 100 ? slice.color : Color.saldoSecondary.opacity(0.3))
+                            .frame(width: 28, height: 28)
+                            .background(
+                                Circle()
+                                    .fill(slice.value < 100 ? slice.color.opacity(0.12) : Color.clear)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(slice.value >= 100)
                 }
-                .buttonStyle(.plain)
-                .disabled(slice.value >= 90)
             }
         }
         .padding(.vertical, 10)
         .padding(.horizontal, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(isSelected ? slice.color.opacity(0.06) : .clear)
-        )
-        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .onTapGesture(perform: onTap)
-        .animation(.spring(response: 0.3), value: isSelected)
     }
 }
 
