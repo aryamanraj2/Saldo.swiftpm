@@ -148,9 +148,8 @@ struct DocumentCameraView: UIViewControllerRepresentable {
         ) {
             // Get the first page (receipts are typically single-page)
             guard scan.pageCount > 0 else {
-                controller.dismiss(animated: true) {
-                    self.parent.onCompletion(.failure(ReceiptProcessorError.noDocumentFound))
-                }
+                // Let SwiftUI dismiss via onCompletion -> showCamera = false
+                parent.onCompletion(.failure(ReceiptProcessorError.noDocumentFound))
                 return
             }
             
@@ -158,21 +157,19 @@ struct DocumentCameraView: UIViewControllerRepresentable {
             parent.scannedImage = image
             parent.isProcessing = true
             
-            // Dismiss camera first
-            controller.dismiss(animated: true) {
-                // Process the image asynchronously
-                Task {
-                    do {
-                        let metadata = try await ReceiptProcessor.shared.process(image: image)
-                        await MainActor.run {
-                            self.parent.isProcessing = false
-                            self.parent.onCompletion(.success(metadata))
-                        }
-                    } catch {
-                        await MainActor.run {
-                            self.parent.isProcessing = false
-                            self.parent.onCompletion(.failure(error))
-                        }
+            // Process the image asynchronously
+            // Do NOT manually dismiss — SwiftUI handles dismissal when onCompletion sets showCamera = false
+            Task {
+                do {
+                    let metadata = try await ReceiptProcessor.shared.process(image: image)
+                    await MainActor.run {
+                        self.parent.isProcessing = false
+                        self.parent.onCompletion(.success(metadata))
+                    }
+                } catch {
+                    await MainActor.run {
+                        self.parent.isProcessing = false
+                        self.parent.onCompletion(.failure(error))
                     }
                 }
             }
@@ -180,9 +177,8 @@ struct DocumentCameraView: UIViewControllerRepresentable {
         
         /// Called when user cancels scanning
         func documentCameraViewControllerDidCancel(_ controller: VNDocumentCameraViewController) {
-            controller.dismiss(animated: true) {
-                self.parent.onCancel()
-            }
+            // Let SwiftUI dismiss via onCancel -> showCamera = false
+            parent.onCancel()
         }
         
         /// Called when scanning fails
@@ -190,9 +186,8 @@ struct DocumentCameraView: UIViewControllerRepresentable {
             _ controller: VNDocumentCameraViewController,
             didFailWithError error: Error
         ) {
-            controller.dismiss(animated: true) {
-                self.parent.onCompletion(.failure(error))
-            }
+            // Let SwiftUI dismiss via onCompletion -> showCamera = false
+            parent.onCompletion(.failure(error))
         }
     }
 }

@@ -209,12 +209,25 @@ struct HomeView: View {
                 )
                 .toolbarBackground(.hidden, for: .navigationBar)
                 // Document Camera (VisionKit) - presented from NavigationStack to avoid being blocked by scanner sheet
-                .fullScreenCover(isPresented: $showCamera) {
+                .fullScreenCover(isPresented: $showCamera, onDismiss: {
+                    // Camera has fully dismissed — restore scanner sheet
+                    // The scanner sheet was already dismissed before camera opened
+                    sheetDetent = .scannerSmall
+                    
+                    if !showResultSheet {
+                        // No result sheet coming — restore scanner sheet
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            withAnimation(.easeOut(duration: 0.3)) {
+                                showScannerSheet = true
+                            }
+                        }
+                    }
+                    // If showResultSheet is true, the result sheet's onDismiss will restore scanner sheet
+                }) {
                     DocumentCameraWithGallery(
                         scannedImage: $scannedImage,
                         isProcessing: $isProcessing,
                         onCompletion: { result in
-                            showCamera = false
                             switch result {
                             case .success(let metadata):
                                 scanResult = metadata
@@ -223,6 +236,7 @@ struct HomeView: View {
                                 scanError = error
                                 showErrorAlert = true
                             }
+                            showCamera = false
                         },
                         onCancel: {
                             showCamera = false
@@ -255,11 +269,27 @@ struct HomeView: View {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                         showAddSubscriptionSheet = true
                     }
+                },
+                onScanReceipt: {
+                    // Dismiss scanner sheet first, then show camera after delay
+                    // This prevents the sheet from being underneath the fullScreenCover
+                    withAnimation(.easeOut(duration: 0.25)) {
+                        showScannerSheet = false
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        showCamera = true
+                    }
                 }
             )
         }
         // Scan Result Sheet
-        .sheet(isPresented: $showResultSheet) {
+        .sheet(isPresented: $showResultSheet, onDismiss: {
+            // Restore scanner sheet after result sheet closes
+            sheetDetent = .scannerSmall
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                showScannerSheet = true
+            }
+        }) {
             if let result = scanResult {
                 ScanResultSheet(metadata: result) {
                     showResultSheet = false

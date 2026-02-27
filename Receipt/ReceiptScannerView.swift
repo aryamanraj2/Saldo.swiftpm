@@ -39,6 +39,9 @@ struct ScannerSheetContainer: View {
     // Callback for adding subscription from the expanded sheet
     var onAddSubscription: (() -> Void)? = nil
     
+    // Callback to dismiss sheet and then show camera
+    var onScanReceipt: (() -> Void)? = nil
+    
     // Check if document scanning is supported
     private var isDocumentScanningSupported: Bool {
         VNDocumentCameraViewController.isSupported
@@ -57,8 +60,8 @@ struct ScannerSheetContainer: View {
                         onScanTap: {
                             print("[Scanner] Scan button tapped")
                             if isDocumentScanningSupported {
-                                // Request camera presentation from parent
-                                showCamera = true
+                                // Dismiss scanner sheet first, then show camera from parent
+                                onScanReceipt?()
                             } else {
                                 print("[Scanner] Document scanning not supported on this device")
                             }
