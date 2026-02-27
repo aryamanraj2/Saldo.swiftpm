@@ -216,10 +216,11 @@ struct HomeView: View {
                     
                     if !showResultSheet {
                         // No result sheet coming — restore scanner sheet
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                            withAnimation(.easeOut(duration: 0.3)) {
-                                showScannerSheet = true
-                            }
+                        // Use 0.6s delay to ensure the fullScreenCover dismiss animation
+                        // is fully complete before presenting the sheet (avoids
+                        // "Attempt to present while a presentation is in progress")
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                            showScannerSheet = true
                         }
                     }
                     // If showResultSheet is true, the result sheet's onDismiss will restore scanner sheet
