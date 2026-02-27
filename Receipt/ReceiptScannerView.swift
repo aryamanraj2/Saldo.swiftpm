@@ -327,7 +327,7 @@ struct SubscriptionGrid: View {
 
 // MARK: - Custom Scroll Bar & Preferences
 struct ScrollOffsetPreferenceKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
+    static var defaultValue: CGFloat { 0 }
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = nextValue()
     }
