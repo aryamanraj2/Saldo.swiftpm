@@ -1,7 +1,7 @@
 import SwiftUI
 
 // MARK: - Subscription Category
-enum SubscriptionCategory: String, CaseIterable, Identifiable {
+enum SubscriptionCategory: String, CaseIterable, Identifiable, Codable {
     case music = "Music"
     case streaming = "Streaming"
     case ai = "AI"
@@ -27,7 +27,7 @@ enum SubscriptionCategory: String, CaseIterable, Identifiable {
 }
 
 // MARK: - Subscription Item
-struct SubscriptionItem: Identifiable, Equatable {
+struct SubscriptionItem: Identifiable, Equatable, Codable {
     let id: UUID
     var name: String
     var amount: Double
@@ -54,6 +54,35 @@ struct SubscriptionItem: Identifiable, Equatable {
     // Determines if we should show a letter icon or SF Symbol
     var usesLetterIcon: Bool {
         category == .misc && !name.isEmpty
+    }
+}
+
+// MARK: - Subscription Persistence
+enum SubscriptionStore {
+    private static var fileURL: URL {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let dir = appSupport.appendingPathComponent("Saldo", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("subscriptions.json")
+    }
+
+    static func load() -> [SubscriptionItem] {
+        guard FileManager.default.fileExists(atPath: fileURL.path) else { return [] }
+        do {
+            let data = try Data(contentsOf: fileURL)
+            return try JSONDecoder().decode([SubscriptionItem].self, from: data)
+        } catch {
+            return []
+        }
+    }
+
+    static func save(_ subscriptions: [SubscriptionItem]) {
+        do {
+            let data = try JSONEncoder().encode(subscriptions)
+            try data.write(to: fileURL, options: .atomic)
+        } catch {
+            // Silently fail — non-critical
+        }
     }
 }
 

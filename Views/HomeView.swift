@@ -338,7 +338,11 @@ struct HomeView: View {
         .task {
             guard !hasLoadedGrails else { return }
             hasLoadedGrails = true
+            subscriptions = SubscriptionStore.load()
             await grailStore.load()
+        }
+        .onChange(of: subscriptions) {
+            SubscriptionStore.save(subscriptions)
         }
     }
 }
