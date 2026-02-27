@@ -112,6 +112,24 @@ struct AllTransactionsView: View {
             
             ScrollView {
                 VStack(spacing: 12) {
+                    // Header Area
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Your")
+                                .font(.subheadline)
+                                .foregroundStyle(Color.saldoSecondary)
+                            Text("Transactions")
+                                .font(.title)
+                                .fontWeight(.bold)
+                                .foregroundStyle(colors.primary)
+                                .animation(.easeInOut, value: colors.primary)
+                        }
+
+                        Spacer()
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 110)
+                    
                     // Floating Liquid Glass Search Bar
                     HStack {
                         Image(systemName: "magnifyingglass")
@@ -172,49 +190,61 @@ struct AllTransactionsView: View {
                         }
                         .frame(maxWidth: .infinity)
                     } else {
-                        ForEach(filteredAndSortedTransactions) { transaction in
-                            TransactionRow(
-                                icon: transaction.icon,
-                                title: transaction.title,
-                                subtitle: transaction.subtitle,
-                                amount: transaction.formattedAmount,
-                                colors: colors
-                            )
+                        VStack(spacing: 8) {
+                            ForEach(filteredAndSortedTransactions) { transaction in
+                                TransactionRow(
+                                    icon: transaction.icon,
+                                    title: transaction.title,
+                                    subtitle: transaction.subtitle,
+                                    amount: transaction.formattedAmount,
+                                    colors: colors
+                                )
+                            }
                         }
+                        .padding(.horizontal, 20)
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 20)
                 .padding(.bottom, 40)
             }
+            .ignoresSafeArea(edges: .top)
         }
-        .navigationTitle("All Transactions")
+        .appStoreStyleToolbar(
+            triggerOffset: 60,
+            beforeTrailing: { sortFilterMenu },
+            afterTrailing: { sortFilterMenu },
+            beforeCenter: { EmptyView() },
+            afterCenter: {
+                Text("Transactions")
+                    .font(.headline)
+                    .foregroundStyle(colors.primary)
+            }
+        )
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .navigationTitle("Transactions")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Section("Sort By") {
-                        Picker("Sort By", selection: $selectedSort) {
-                            ForEach(SortOption.allCases) { option in
-                                Text(option.rawValue).tag(option)
-                            }
-                        }
+    }
+    
+    private var sortFilterMenu: some View {
+        Menu {
+            Section("Sort By") {
+                Picker("Sort By", selection: $selectedSort) {
+                    ForEach(SortOption.allCases) { option in
+                        Text(option.rawValue).tag(option)
                     }
-                    
-                    Section("Filter By Type") {
-                        Picker("Filter By Type", selection: $selectedFilter) {
-                            ForEach(FilterOption.allCases) { option in
-                                Text(option.rawValue).tag(option)
-                            }
-                        }
-                    }
-                } label: {
-                    Image(systemName: isFilteredOrSorted ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
-                        .foregroundStyle(isFilteredOrSorted ? colors.accent : colors.primary)
                 }
             }
+            
+            Section("Filter By Type") {
+                Picker("Filter By Type", selection: $selectedFilter) {
+                    ForEach(FilterOption.allCases) { option in
+                        Text(option.rawValue).tag(option)
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: isFilteredOrSorted ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                .font(.title3)
+                .foregroundStyle(isFilteredOrSorted ? colors.accent : colors.primary)
         }
-        .toolbarBackground(.visible, for: .navigationBar)
-        .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
     }
 }
