@@ -257,7 +257,6 @@ struct ExpandedSheetContent: View {
             
             // Subscription Grid (shows actual subscriptions or placeholders)
             SubscriptionGrid(subscriptions: subscriptions, colors: colors)
-                .padding(.horizontal, 16)
                 .tutorialHighlight(.grills)
             
             Spacer()
@@ -270,31 +269,126 @@ struct SubscriptionGrid: View {
     var subscriptions: [SubscriptionItem]
     var colors: ThemeColors
     
+    private let itemWidth = (UIScreen.main.bounds.width - 56) / 3
+    @State private var scrollOffset: CGFloat = 0
+    
     var body: some View {
-        LazyVGrid(columns: [
-            GridItem(.flexible(), spacing: 12),
-            GridItem(.flexible(), spacing: 12),
-            GridItem(.flexible(), spacing: 12)
-        ], spacing: 12) {
-            if subscriptions.isEmpty {
-                // Show placeholders when empty
-                ForEach(0..<3, id: \.self) { index in
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color.saldoSecondary.opacity(0.06))
-                        .frame(height: 60)
-                        .overlay(
-                            Image(systemName: "creditcard")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundStyle(Color.saldoSecondary.opacity(0.25))
-                        )
+        VStack(spacing: 8) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    if subscriptions.isEmpty {
+                        // Show placeholders when empty
+                        ForEach(0..<3, id: \.self) { index in
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(Color.saldoSecondary.opacity(0.06))
+                                .frame(width: itemWidth, height: 60)
+                                .overlay(
+                                    Image(systemName: "creditcard")
+                                        .font(.system(size: 16, weight: .medium))
+                                        .foregroundStyle(Color.saldoSecondary.opacity(0.25))
+                                )
+                        }
+                    } else {
+                        // Show actual subscriptions
+                        ForEach(subscriptions) { subscription in
+                            SubscriptionGridItem(subscription: subscription, colors: colors)
+                                .frame(width: itemWidth)
+                        }
+                    }
                 }
-            } else {
-                // Show actual subscriptions
-                ForEach(subscriptions) { subscription in
-                    SubscriptionGridItem(subscription: subscription, colors: colors)
-                }
+                .padding(.horizontal, 16)
+                .background(GeometryReader { geo in
+                    Color.clear.preference(
+                        key: ScrollOffsetPreferenceKey.self,
+                        value: geo.frame(in: .named("scroll")).minX
+                    )
+                })
+            }
+            .coordinateSpace(name: "scroll")
+            .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
+                self.scrollOffset = value
+            }
+            
+            // Minimalist Custom Scrollbar when there are enough items to scroll
+            if subscriptions.count >= 4 {
+                CustomScrollBar(
+                    offset: scrollOffset,
+                    itemCount: subscriptions.count,
+                    itemWidth: itemWidth,
+                    colors: colors
+                )
             }
         }
+    }
+}
+
+// MARK: - Custom Scroll Bar & Preferences
+struct ScrollOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+struct CustomScrollBar: View {
+    var offset: CGFloat
+    var itemCount: Int
+    var itemWidth: CGFloat
+    var colors: ThemeColors
+    
+    // Container width roughly equivalent to screen minus padding
+    private let containerWidth: CGFloat = UIScreen.main.bounds.width - 32
+    private let trackWidth: CGFloat = 40
+    
+    var body: some View {
+        // Track
+        Capsule()
+            .fill(Color.saldoSecondary.opacity(0.15))
+            .frame(width: trackWidth, height: 4)
+            .overlay(alignment: .leading) {
+                // Indicator
+                Capsule()
+                    .fill(colors.accent)
+                    .frame(width: indicatorWidth, height: 4)
+                    .offset(x: indicatorOffset)
+            }
+            .opacity(0.6)
+            .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.8), value: offset)
+            .padding(.top, 4)
+    }
+    
+    // Total scrollable width
+    private var totalContentWidth: CGFloat {
+        (itemWidth * CGFloat(itemCount)) + (12 * CGFloat(itemCount - 1)) + 32
+    }
+    
+    // Max distance the content can scroll
+    private var maxScroll: CGFloat {
+        max(0, totalContentWidth - containerWidth)
+    }
+    
+    // Ratio of visible width to total width
+    private var widthRatio: CGFloat {
+        min(1.0, containerWidth / totalContentWidth)
+    }
+    
+    private var indicatorWidth: CGFloat {
+        max(12, trackWidth * widthRatio)
+    }
+    
+    private var indicatorOffset: CGFloat {
+        if maxScroll <= 0 { return 0 }
+        
+        // Progress of scroll (0 to 1)
+        let progress = -offset / maxScroll
+        
+        // Clamp progress
+        let clampedProgress = min(max(progress, 0), 1)
+        
+        // Max offset for the indicator within the track
+        let maxIndicatorOffset = trackWidth - indicatorWidth
+        
+        return clampedProgress * maxIndicatorOffset
     }
 }
 
@@ -344,22 +438,23 @@ struct SubscriptionGridItem: View {
 struct SubscriptionPlaceholder: View {
     var colors: ThemeColors
     
+    private let itemWidth = (UIScreen.main.bounds.width - 56) / 3
+    
     var body: some View {
-        LazyVGrid(columns: [
-            GridItem(.flexible(), spacing: 12),
-            GridItem(.flexible(), spacing: 12),
-            GridItem(.flexible(), spacing: 12)
-        ], spacing: 12) {
-            ForEach(0..<3, id: \.self) { index in
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.saldoSecondary.opacity(0.06))
-                    .frame(height: 60)
-                    .overlay(
-                        Image(systemName: "creditcard")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundStyle(Color.saldoSecondary.opacity(0.25))
-                    )
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(0..<3, id: \.self) { index in
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.saldoSecondary.opacity(0.06))
+                        .frame(width: itemWidth, height: 60)
+                        .overlay(
+                            Image(systemName: "creditcard")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundStyle(Color.saldoSecondary.opacity(0.25))
+                        )
+                }
             }
+            .padding(.horizontal, 16)
         }
     }
 }
