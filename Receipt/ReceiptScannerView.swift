@@ -297,16 +297,19 @@ struct SubscriptionGrid: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                .background(GeometryReader { geo in
-                    Color.clear.preference(
-                        key: ScrollOffsetPreferenceKey.self,
-                        value: geo.frame(in: .named("scroll")).minX
-                    )
-                })
+                .background(
+                    GeometryReader { geo in
+                        Color.clear.preference(
+                            key: ScrollOffsetPreferenceKey.self,
+                            value: geo.frame(in: .named("SubscriptionScroll")).minX
+                        )
+                    }
+                )
             }
-            .coordinateSpace(name: "scroll")
+            .coordinateSpace(name: "SubscriptionScroll")
             .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
-                self.scrollOffset = value
+                // Adjust logic to track real offset; minX starts positive because of the leading 16pt padding
+                self.scrollOffset = value - 16
             }
             
             // Minimalist Custom Scrollbar when there are enough items to scroll
