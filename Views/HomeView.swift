@@ -23,6 +23,8 @@ struct HomeView: View {
     @State private var showManualPaymentSheet = false
     @State private var showProfileSheet = false
     @State private var showGrailLimitAlert = false
+    @State private var selectedGrailForDetail: GrailPreviewItem?
+    @State private var showGrailDetailSheet = false
     
     // Subscription Data
     @State private var subscriptions: [SubscriptionItem] = []
@@ -93,7 +95,7 @@ struct HomeView: View {
                                     subtitle: "Grails",
                                     colors: colors,
                                     grailPreviews: grailStore.cachedPreviewItems,
-                                    action: {
+                                    onAddGrail: {
                                         if grailStore.cachedPreviewItems.count >= 3 {
                                             showGrailLimitAlert = true
                                         } else {
@@ -104,6 +106,15 @@ struct HomeView: View {
                                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                                                 showGrailsSheet = true
                                             }
+                                        }
+                                    },
+                                    onGrailTapped: { preview in
+                                        selectedGrailForDetail = preview
+                                        withAnimation(.easeOut(duration: 0.25)) {
+                                            showScannerSheet = false
+                                        }
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                                            showGrailDetailSheet = true
                                         }
                                     }
                                 )
@@ -325,6 +336,22 @@ struct HomeView: View {
                 Task {
                     await grailStore.add(grail: newGrail, maskedImage: maskedImage)
                 }
+            }
+        }
+        // Grail Detail Sheet
+        .sheet(isPresented: $showGrailDetailSheet, onDismiss: {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                withAnimation(.easeOut(duration: 0.3)) {
+                    showScannerSheet = true
+                }
+            }
+        }) {
+            if let preview = selectedGrailForDetail {
+                GrailDetailView(
+                    colors: colors,
+                    grailPreview: preview,
+                    grailStore: grailStore
+                )
             }
         }
         // Add Subscription Sheet (for subscription plus button in scanner sheet)

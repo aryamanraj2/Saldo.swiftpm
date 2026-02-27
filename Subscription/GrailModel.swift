@@ -48,6 +48,21 @@ enum GrailStrictness: String, CaseIterable, Identifiable, Codable {
     }
 }
 
+// MARK: - Deposit Record
+struct DepositRecord: Identifiable, Equatable, Codable {
+    let id: UUID
+    var amount: Double
+    var date: Date
+    var note: String?
+    
+    init(id: UUID = UUID(), amount: Double, date: Date = Date(), note: String? = nil) {
+        self.id = id
+        self.amount = amount
+        self.date = date
+        self.note = note
+    }
+}
+
 // MARK: - Grail Item
 struct GrailItem: Identifiable, Equatable, Codable {
     let id: UUID
@@ -59,6 +74,16 @@ struct GrailItem: Identifiable, Equatable, Codable {
     var strictness: GrailStrictness
     var createdAt: Date
     var maskedImageFilename: String?
+    var deposits: [DepositRecord]
+    
+    var progress: Double {
+        guard targetAmount > 0 else { return 0 }
+        return min(currentAmount / targetAmount, 1.0)
+    }
+    
+    var remainingAmount: Double {
+        max(targetAmount - currentAmount, 0)
+    }
     
     init(id: UUID = UUID(), 
          name: String, 
@@ -68,7 +93,8 @@ struct GrailItem: Identifiable, Equatable, Codable {
          category: GrailCategory, 
          strictness: GrailStrictness,
          createdAt: Date = Date(),
-         maskedImageFilename: String? = nil) {
+         maskedImageFilename: String? = nil,
+         deposits: [DepositRecord] = []) {
         self.id = id
         self.name = name
         self.targetAmount = targetAmount
@@ -78,6 +104,7 @@ struct GrailItem: Identifiable, Equatable, Codable {
         self.strictness = strictness
         self.createdAt = createdAt
         self.maskedImageFilename = maskedImageFilename
+        self.deposits = deposits
     }
     
     private enum CodingKeys: String, CodingKey {
@@ -90,6 +117,7 @@ struct GrailItem: Identifiable, Equatable, Codable {
         case strictness
         case createdAt
         case maskedImageFilename
+        case deposits
     }
     
     init(from decoder: Decoder) throws {
@@ -103,6 +131,7 @@ struct GrailItem: Identifiable, Equatable, Codable {
         self.strictness = try container.decode(GrailStrictness.self, forKey: .strictness)
         self.createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
         self.maskedImageFilename = try container.decodeIfPresent(String.self, forKey: .maskedImageFilename)
+        self.deposits = try container.decodeIfPresent([DepositRecord].self, forKey: .deposits) ?? []
     }
     
     func encode(to encoder: Encoder) throws {
@@ -116,5 +145,6 @@ struct GrailItem: Identifiable, Equatable, Codable {
         try container.encode(strictness, forKey: .strictness)
         try container.encode(createdAt, forKey: .createdAt)
         try container.encodeIfPresent(maskedImageFilename, forKey: .maskedImageFilename)
+        try container.encode(deposits, forKey: .deposits)
     }
 }

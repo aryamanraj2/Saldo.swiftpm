@@ -716,6 +716,8 @@ struct GrailSwipeGalleryView: View {
     var colors: ThemeColors
     @Binding var selectedIndex: Int
     var addIcon: String
+    var onGrailTapped: ((GrailPreviewItem) -> Void)? = nil
+    var onAddTapped: (() -> Void)? = nil
 
     var body: some View {
         let slides = Array(previews.prefix(3))
@@ -744,6 +746,10 @@ struct GrailSwipeGalleryView: View {
                             .minimumScaleFactor(0.85)
                     }
                     .padding(.top, 2)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        onGrailTapped?(preview)
+                    }
                     .tag(index)
                 }
                 
@@ -761,7 +767,11 @@ struct GrailSwipeGalleryView: View {
                             .foregroundStyle(colors.secondary)
                         Spacer(minLength: 0)
                     }
-                    .frame(height: 196) // Match the content height
+                    .frame(height: 196)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        onAddTapped?()
+                    }
                     .padding(.top, 2)
                     .tag(slides.count)
                 }
@@ -832,7 +842,8 @@ struct ActionButton: View {
     var subtitle: String
     var colors: ThemeColors
     var grailPreviews: [GrailPreviewItem] = []
-    var action: () -> Void
+    var onAddGrail: () -> Void
+    var onGrailTapped: ((GrailPreviewItem) -> Void)? = nil
     
     @State private var selectedIndex = 0
     
@@ -850,14 +861,20 @@ struct ActionButton: View {
                         .foregroundStyle(colors.secondary)
                 }
                 .padding()
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    onAddGrail()
+                }
             } else {
                 GrailSwipeGalleryView(
                     previews: grailPreviews,
                     colors: colors,
                     selectedIndex: $selectedIndex,
-                    addIcon: icon
+                    addIcon: icon,
+                    onGrailTapped: onGrailTapped,
+                    onAddTapped: onAddGrail
                 )
-                .padding(.vertical, 16) // Keep some vertical padding to avoid clipping top/bottom
+                .padding(.vertical, 16)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -874,8 +891,6 @@ struct ActionButton: View {
                 }
             }
         }
-        .contentShape(.rect(cornerRadius: 20))
-        .onTapGesture(perform: action)
         .onChange(of: grailPreviews.count) { _, newCount in
             if newCount == 0 {
                 selectedIndex = 0

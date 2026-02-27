@@ -75,6 +75,73 @@ final class GrailStore {
         Array(cachedPreviewItems.prefix(limit))
     }
 
+    func addDeposit(to grailID: UUID, amount: Double, note: String?) async {
+        let metadataURL = metadataFileURL()
+        let imagesURL = imagesDirectoryURL()
+        var updatedGrails = grails
+
+        guard let index = updatedGrails.firstIndex(where: { $0.id == grailID }) else { return }
+
+        let deposit = DepositRecord(amount: amount, note: note)
+        updatedGrails[index].deposits.append(deposit)
+        updatedGrails[index].currentAmount += amount
+
+        do {
+            let snapshot = try await runInBackground {
+                try Self.persistGrails(updatedGrails, metadataURL: metadataURL)
+                return Self.buildPreviewItems(
+                    from: updatedGrails,
+                    limit: Self.previewLimit,
+                    imagesURL: imagesURL
+                )
+            }
+            grails = updatedGrails
+            cachedPreviewItems = snapshot
+            warmContourCache(for: snapshot)
+        } catch {
+            print("⚠️ [GrailStore] Failed to add deposit: \(error.localizedDescription)")
+        }
+    }
+
+    func updateImage(for grailID: UUID, maskedImage: UIImage) async {
+        let metadataURL = metadataFileURL()
+        let imagesURL = imagesDirectoryURL()
+        var updatedGrails = grails
+
+        guard let index = updatedGrails.firstIndex(where: { $0.id == grailID }) else { return }
+
+        let filename = "\(grailID.uuidString).png"
+
+        do {
+            // Do file I/O in background
+            try await runInBackground {
+                try Self.ensureStorageDirectories(imagesURL: imagesURL)
+                let imageURL = imagesURL.appendingPathComponent(filename, isDirectory: false)
+                let optimized = Self.optimizedStoredImage(from: maskedImage, maxDimension: Self.maxStoredImageDimension)
+                if let imageData = optimized.pngData() {
+                    try imageData.write(to: imageURL, options: .atomic)
+                }
+            }
+
+            // Mutate on MainActor
+            updatedGrails[index].maskedImageFilename = filename
+
+            let snapshot = try await runInBackground {
+                try Self.persistGrails(updatedGrails, metadataURL: metadataURL)
+                return Self.buildPreviewItems(
+                    from: updatedGrails,
+                    limit: Self.previewLimit,
+                    imagesURL: imagesURL
+                )
+            }
+            grails = updatedGrails
+            cachedPreviewItems = snapshot
+            warmContourCache(for: snapshot)
+        } catch {
+            print("⚠️ [GrailStore] Failed to update image: \(error.localizedDescription)")
+        }
+    }
+
     private func warmContourCache(for previews: [GrailPreviewItem]) {
         let visuals = previews.compactMap { preview -> (cacheID: String, image: UIImage)? in
             guard let image = preview.image else { return nil }
