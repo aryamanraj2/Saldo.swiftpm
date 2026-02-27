@@ -297,19 +297,11 @@ struct SubscriptionGrid: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                .background(
-                    GeometryReader { geo in
-                        Color.clear.preference(
-                            key: ScrollOffsetPreferenceKey.self,
-                            value: geo.frame(in: .named("SubscriptionScroll")).minX
-                        )
-                    }
-                )
             }
-            .coordinateSpace(name: "SubscriptionScroll")
-            .onPreferenceChange(ScrollOffsetPreferenceKey.self) { value in
-                // Adjust logic to track real offset; minX starts positive because of the leading 16pt padding
-                self.scrollOffset = value - 16
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                geometry.contentOffset.x
+            } action: { _, newValue in
+                scrollOffset = newValue
             }
             
             // Minimalist Custom Scrollbar when there are enough items to scroll
@@ -325,14 +317,7 @@ struct SubscriptionGrid: View {
     }
 }
 
-// MARK: - Custom Scroll Bar & Preferences
-struct ScrollOffsetPreferenceKey: PreferenceKey {
-    static var defaultValue: CGFloat { 0 }
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
-    }
-}
-
+// MARK: - Custom Scroll Bar
 struct CustomScrollBar: View {
     var offset: CGFloat
     var itemCount: Int
@@ -383,7 +368,7 @@ struct CustomScrollBar: View {
         if maxScroll <= 0 { return 0 }
         
         // Progress of scroll (0 to 1)
-        let progress = -offset / maxScroll
+        let progress = offset / maxScroll
         
         // Clamp progress
         let clampedProgress = min(max(progress, 0), 1)
