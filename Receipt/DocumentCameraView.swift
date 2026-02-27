@@ -192,111 +192,360 @@ struct DocumentCameraView: UIViewControllerRepresentable {
     }
 }
 
-// MARK: - Scan Result Sheet
-/// Displays extracted receipt data after scanning
+// MARK: - Scan Result Sheet (Themed & Editable)
+/// Displays extracted receipt data after scanning, matching the app's glassmorphic design.
+/// Fields are editable so users can correct OCR mistakes.
 struct ScanResultSheet: View {
     let metadata: ReceiptMetadata
+    var colors: ThemeColors
     var onDismiss: () -> Void
-    
+
+    // Editable state pre-populated from OCR
+    @State private var merchantName: String = ""
+    @State private var amountString: String = ""
+    @State private var selectedDate: Date = Date()
+
+    @FocusState private var focusedField: ScanField?
+    @State private var appeared = false
+
+    private enum ScanField: Hashable {
+        case merchant, amount
+    }
+
     var body: some View {
-        NavigationStack {
-            VStack(spacing: 24) {
-                // Success Icon
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 60))
-                    .foregroundStyle(.green)
-                
-                Text("Receipt Scanned")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                
-                // Extracted Data
-                VStack(spacing: 16) {
-                    if let merchant = metadata.merchantName {
-                        DataRow(label: "Merchant", value: merchant, icon: "storefront.fill")
+        VStack(spacing: 0) {
+            // MARK: - Header (matches ManualPaymentSheetHeader)
+            ScanResultHeader(colors: colors, onCancel: onDismiss)
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 20)
+
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Success icon
+                    ZStack {
+                        Circle()
+                            .fill(colors.accent.opacity(0.12))
+                            .frame(width: 88, height: 88)
+
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 44, weight: .medium))
+                            .foregroundStyle(colors.accent)
+                            .symbolEffect(.bounce, value: appeared)
                     }
-                    
-                    if let date = metadata.date {
-                        DataRow(label: "Date", value: formatDate(date), icon: "calendar")
+                    .scaleEffect(appeared ? 1.0 : 0.6)
+                    .opacity(appeared ? 1.0 : 0)
+                    .padding(.top, 8)
+
+                    Text("Receipt Scanned")
+                        .font(.title3)
+                        .fontWeight(.bold)
+                        .foregroundStyle(Color.saldoPrimary)
+
+                    // MARK: - Editable Fields
+                    VStack(spacing: 16) {
+                        // Merchant
+                        EditableDataRow(
+                            label: "Merchant",
+                            icon: "storefront.fill",
+                            text: $merchantName,
+                            placeholder: "Enter merchant name",
+                            colors: colors,
+                            isFocused: focusedField == .merchant,
+                            onTap: { focusedField = .merchant }
+                        )
+                        .focused($focusedField, equals: .merchant)
+
+                        // Amount
+                        EditableDataRow(
+                            label: "Total Amount",
+                            icon: "indianrupeesign.circle.fill",
+                            text: $amountString,
+                            placeholder: "0.00",
+                            colors: colors,
+                            keyboardType: .decimalPad,
+                            isFocused: focusedField == .amount,
+                            onTap: { focusedField = .amount }
+                        )
+                        .focused($focusedField, equals: .amount)
+
+                        // Date (native iOS DatePicker)
+                        DatePickerRow(
+                            label: "Date",
+                            icon: "calendar",
+                            date: $selectedDate,
+                            colors: colors
+                        )
                     }
-                    
-                    if let total = metadata.formattedTotal {
-                        DataRow(label: "Total", value: total, icon: "indianrupeesign.circle.fill")
+                    .padding(16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .fill(Color.saldoSecondary.opacity(0.06))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                    .strokeBorder(Color.saldoSecondary.opacity(0.1), lineWidth: 0.5)
+                            )
+                    )
+                    .padding(.horizontal, 20)
+
+                    if !metadata.hasData {
+                        HStack(spacing: 6) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.caption)
+                                .foregroundStyle(colors.accent)
+                            Text("No structured data found — enter details manually")
+                                .font(.caption)
+                                .foregroundStyle(Color.saldoSecondary)
+                        }
                     }
-                }
-                .padding()
-                .background(.ultraThinMaterial)
-                .clipShape(RoundedRectangle(cornerRadius: 16))
-                
-                if !metadata.hasData {
-                    Text("No structured data found in receipt")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                
-                Spacer()
-                
-                // Action Buttons
-                VStack(spacing: 12) {
-                    Button(action: onDismiss) {
-                        Text("Add Transaction")
-                            .font(.headline)
-                            .foregroundStyle(.white)
+
+                    // Hint
+                    HStack(spacing: 6) {
+                        Image(systemName: "pencil.line")
+                            .font(.caption2)
+                        Text("Tap any field to edit")
+                            .font(.caption2)
+                    }
+                    .foregroundStyle(Color.saldoSecondary.opacity(0.6))
+
+                    Spacer(minLength: 20)
+
+                    // MARK: - Action Buttons
+                    VStack(spacing: 12) {
+                        Button(action: onDismiss) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 18, weight: .semibold))
+                                Text("Add Transaction")
+                                    .font(.body)
+                                    .fontWeight(.semibold)
+                            }
+                            .foregroundStyle(Color.white)
                             .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(.blue)
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .padding(.vertical, 16)
+                            .background(
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .fill(colors.accent)
+                            )
+                        }
+
+                        Button(action: onDismiss) {
+                            Text("Discard")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundStyle(Color.saldoSecondary)
+                        }
                     }
-                    
-                    Button("Scan Another") {
-                        onDismiss()
-                    }
-                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 20)
                 }
             }
-            .padding(24)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button(action: onDismiss) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary)
-                    }
+            .scrollDismissesKeyboard(.interactively)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background {
+            RoundedRectangle(cornerRadius: 32, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .opacity(0.62)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 32, style: .continuous)
+                        .strokeBorder(.white.opacity(0.22), lineWidth: 0.5)
                 }
+        }
+        .presentationDetents([.fraction(0.75)])
+        .presentationDragIndicator(.visible)
+        .modifier(ScanResultSheetEnhancements(cornerRadius: 32))
+        .onAppear {
+            // Pre-populate from OCR
+            merchantName = metadata.merchantName ?? ""
+            if let total = metadata.formattedTotal {
+                amountString = total
+            } else if let amount = metadata.totalAmount {
+                amountString = "\(amount)"
+            }
+            if let date = metadata.date {
+                selectedDate = date
+            }
+            withAnimation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.1)) {
+                appeared = true
             }
         }
     }
-    
-    private func formatDate(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        return formatter.string(from: date)
+}
+
+// MARK: - Scan Result Header
+private struct ScanResultHeader: View {
+    var colors: ThemeColors
+    var onCancel: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Button(action: onCancel) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(Color.saldoPrimary)
+                    .frame(width: 36, height: 36)
+                    .background(.ultraThinMaterial)
+                    .clipShape(Circle())
+                    .overlay(
+                        Circle()
+                            .strokeBorder(.white.opacity(0.3), lineWidth: 0.5)
+                    )
+            }
+
+            HStack(spacing: 8) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(colors.accent.opacity(0.12))
+                        .frame(width: 32, height: 32)
+
+                    Image(systemName: "doc.text.viewfinder")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(colors.accent)
+                }
+
+                Text("Scan Result")
+                    .font(.body)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(Color.saldoPrimary)
+
+                Spacer()
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .frame(height: 56)
+            .frame(maxWidth: .infinity)
+            .background(
+                Capsule()
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        Capsule()
+                            .strokeBorder(.white.opacity(0.3), lineWidth: 0.5)
+                    )
+                    .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
+            )
+        }
     }
 }
 
-// MARK: - Data Row Component
-struct DataRow: View {
+// MARK: - Editable Data Row
+struct EditableDataRow: View {
     let label: String
-    let value: String
     let icon: String
-    
+    @Binding var text: String
+    var placeholder: String = ""
+    var colors: ThemeColors
+    var keyboardType: UIKeyboardType = .default
+    var isFocused: Bool = false
+    var onTap: () -> Void = {}
+
     var body: some View {
-        HStack {
-            Image(systemName: icon)
-                .font(.title3)
-                .foregroundStyle(.secondary)
-                .frame(width: 32)
-            
-            VStack(alignment: .leading, spacing: 2) {
+        HStack(spacing: 12) {
+            // Icon
+            ZStack {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(colors.accent.opacity(0.12))
+                    .frame(width: 38, height: 38)
+
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(colors.accent)
+            }
+
+            // Label + TextField
+            VStack(alignment: .leading, spacing: 4) {
                 Text(label)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text(value)
+                    .fontWeight(.medium)
+                    .foregroundStyle(Color.saldoSecondary)
+
+                TextField(placeholder, text: $text)
                     .font(.body)
                     .fontWeight(.medium)
+                    .foregroundStyle(Color.saldoPrimary)
+                    .keyboardType(keyboardType)
+                    .onTapGesture { onTap() }
             }
-            
-            Spacer()
+
+            Spacer(minLength: 0)
+
+            // Edit indicator
+            Image(systemName: "pencil")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Color.saldoSecondary.opacity(0.4))
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.saldoSecondary.opacity(0.04))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .strokeBorder(
+                            isFocused ? colors.accent.opacity(0.4) : Color.clear,
+                            lineWidth: 1.5
+                        )
+                )
+        )
+        .animation(.easeInOut(duration: 0.2), value: isFocused)
+    }
+}
+
+// MARK: - Date Picker Row (Native iOS Calendar)
+struct DatePickerRow: View {
+    let label: String
+    let icon: String
+    @Binding var date: Date
+    var colors: ThemeColors
+
+    var body: some View {
+        HStack(spacing: 12) {
+            // Icon
+            ZStack {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(colors.accent.opacity(0.12))
+                    .frame(width: 38, height: 38)
+
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(colors.accent)
+            }
+
+            // Label
+            VStack(alignment: .leading, spacing: 4) {
+                Text(label)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundStyle(Color.saldoSecondary)
+
+                DatePicker("", selection: $date, displayedComponents: .date)
+                    .datePickerStyle(.compact)
+                    .labelsHidden()
+                    .tint(colors.accent)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.saldoSecondary.opacity(0.04))
+        )
+    }
+}
+
+// MARK: - Sheet Enhancements
+private struct ScanResultSheetEnhancements: ViewModifier {
+    let cornerRadius: CGFloat
+
+    func body(content: Content) -> some View {
+        if #available(iOS 16.4, *) {
+            content
+                .presentationCornerRadius(cornerRadius)
+                .presentationBackground(.clear)
+        } else {
+            content
         }
     }
 }
@@ -308,12 +557,12 @@ struct ProcessingOverlay: View {
         ZStack {
             Color.black.opacity(0.4)
                 .ignoresSafeArea()
-            
+
             VStack(spacing: 16) {
                 ProgressView()
                     .scaleEffect(1.5)
                     .tint(.white)
-                
+
                 Text("Processing Receipt...")
                     .font(.headline)
                     .foregroundStyle(.white)
@@ -326,5 +575,5 @@ struct ProcessingOverlay: View {
 }
 
 #Preview {
-    ScanResultSheet(metadata: .sample, onDismiss: {})
+    ScanResultSheet(metadata: .sample, colors: AppTheme.wealthy.colors, onDismiss: {})
 }

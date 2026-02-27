@@ -292,7 +292,7 @@ struct HomeView: View {
             }
         }) {
             if let result = scanResult {
-                ScanResultSheet(metadata: result) {
+                ScanResultSheet(metadata: result, colors: colors) {
                     showResultSheet = false
                     scanResult = nil
                 }
