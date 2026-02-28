@@ -925,11 +925,12 @@ struct GrailSwipeGalleryView: View {
             if totalSlides > 1 {
                 HStack(spacing: 5) {
                     ForEach(0..<totalSlides, id: \.self) { index in
-                        Circle()
-                            .fill(index == selectedIndex ? colors.accent : Color.saldoSecondary.opacity(0.25))
-                            .frame(width: index == selectedIndex ? 7 : 6, height: index == selectedIndex ? 7 : 6)
+                        Capsule()
+                            .fill(index == selectedIndex ? colors.accent : colors.primary.opacity(0.15))
+                            .frame(width: index == selectedIndex ? 16 : 6, height: 6)
                     }
                 }
+                .animation(.spring(response: 0.3, dampingFraction: 0.8), value: selectedIndex)
             }
         }
     }
