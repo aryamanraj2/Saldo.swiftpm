@@ -77,8 +77,8 @@ struct HomeView: View {
                         .padding(.horizontal, 20)
                         .padding(.top, 60) // Add padding to avoid collision
                         
-                        // Main Balance
-                        BalanceCard(balance: balance, colors: colors)
+                        // Main Balance (Swipeable: Remaining Balance ↔ Total Saved)
+                        SwipeableBalanceCard(balance: balance, colors: colors)
                             .padding(.horizontal, 20)
                             .tutorialHighlight(.remainingBalance)
                         

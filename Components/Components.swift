@@ -141,6 +141,116 @@ struct BalanceCard: View {
     }
 }
 
+// MARK: - Total Saved Card (Page 2 of Swipeable Balance)
+struct TotalSavedCard: View {
+    var colors: ThemeColors
+    @AppStorage("totalSaved") private var totalSaved: Double = 0
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Total Saved")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(Color.saldoSecondary)
+                
+                Spacer()
+                
+                // Subtle clickable arrow
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(Color.saldoSecondary.opacity(0.5))
+            }
+            
+            Text("₹\(totalSaved, format: .number.precision(.fractionLength(2)))")
+                .contentTransition(.numericText())
+                .font(.system(size: 48, weight: .bold, design: .rounded))
+                .foregroundStyle(colors.primary)
+            
+            HStack(spacing: 4) {
+                Image(systemName: "leaf.fill")
+                    .foregroundStyle(colors.accent)
+                Text("Since you started using Saldo")
+                    .font(.footnote)
+                    .foregroundStyle(Color.saldoSecondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(24)
+    }
+}
+
+// MARK: - Swipeable Balance Card
+struct SwipeableBalanceCard: View {
+    var balance: Double
+    var colors: ThemeColors
+    var onTotalSavedTapped: (() -> Void)? = nil
+    
+    @State private var selectedPage: Int = 0
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            TabView(selection: $selectedPage) {
+                // Page 1: Remaining Balance
+                BalanceCardContent(balance: balance, colors: colors)
+                    .tag(0)
+                
+                // Page 2: Total Saved
+                TotalSavedCard(colors: colors)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        onTotalSavedTapped?()
+                    }
+                    .tag(1)
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .frame(height: 140)
+            
+            // Dot Indicators
+            HStack(spacing: 6) {
+                ForEach(0..<2, id: \.self) { index in
+                    Circle()
+                        .fill(index == selectedPage ? colors.accent : Color.saldoSecondary.opacity(0.25))
+                        .frame(width: index == selectedPage ? 7 : 6, height: index == selectedPage ? 7 : 6)
+                        .animation(.easeInOut(duration: 0.2), value: selectedPage)
+                }
+            }
+            .padding(.bottom, 16)
+        }
+        .liquidGlass(cornerRadius: 24, material: .regular, shadowColor: colors.accent)
+    }
+}
+
+// MARK: - Balance Card Content (Inner view for page 1, no glass)
+struct BalanceCardContent: View {
+    var balance: Double
+    var colors: ThemeColors
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Remaining Balance")
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundStyle(Color.saldoSecondary)
+            
+            Text("₹\(balance, format: .number.precision(.fractionLength(2)))")
+                .contentTransition(.numericText())
+                .font(.system(size: 48, weight: .bold, design: .rounded))
+                .foregroundStyle(colors.primary)
+            
+            HStack(spacing: 4) {
+                Image(systemName: balance < 1000 ? "exclamationmark.circle.fill" : "arrow.up.right.circle.fill")
+                    .foregroundStyle(colors.accent)
+                Text(balance < 1000 ? "Low balance warning" : "On track this month")
+                    .font(.footnote)
+                    .foregroundStyle(Color.saldoSecondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(24)
+    }
+}
+
 // MARK: - Spend Data Point (Backend-Ready Model)
 struct SpendDataPoint: Identifiable {
     let id = UUID()
