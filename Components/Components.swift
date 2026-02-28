@@ -187,36 +187,69 @@ struct SwipeableBalanceCard: View {
     var onTotalSavedTapped: (() -> Void)? = nil
     
     @State private var selectedPage: Int = 0
+    @State private var dragOffset: CGFloat = 0
     
     var body: some View {
-        VStack(spacing: 0) {
-            TabView(selection: $selectedPage) {
-                // Page 1: Remaining Balance
-                BalanceCardContent(balance: balance, colors: colors)
-                    .tag(0)
+        ZStack(alignment: .bottom) {
+            GeometryReader { geo in
+                let pageWidth = geo.size.width
                 
-                // Page 2: Total Saved
-                TotalSavedCard(colors: colors)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        onTotalSavedTapped?()
-                    }
-                    .tag(1)
+                HStack(spacing: 0) {
+                    // Page 1: Remaining Balance
+                    BalanceCardContent(balance: balance, colors: colors)
+                        .frame(width: pageWidth)
+                    
+                    // Page 2: Total Saved
+                    TotalSavedCard(colors: colors)
+                        .frame(width: pageWidth)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            onTotalSavedTapped?()
+                        }
+                }
+                .offset(x: -CGFloat(selectedPage) * pageWidth + dragOffset)
+                .gesture(
+                    DragGesture(minimumDistance: 15)
+                        .onChanged { value in
+                            // Resist dragging past edges
+                            let translation = value.translation.width
+                            if (selectedPage == 0 && translation > 0) ||
+                               (selectedPage == 1 && translation < 0) {
+                                dragOffset = translation * 0.3 // rubber-band
+                            } else {
+                                dragOffset = translation
+                            }
+                        }
+                        .onEnded { value in
+                            let threshold: CGFloat = pageWidth * 0.25
+                            let velocity = value.predictedEndTranslation.width
+                            
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.86)) {
+                                if (value.translation.width < -threshold || velocity < -150) && selectedPage == 0 {
+                                    selectedPage = 1
+                                } else if (value.translation.width > threshold || velocity > 150) && selectedPage == 1 {
+                                    selectedPage = 0
+                                }
+                                dragOffset = 0
+                            }
+                        }
+                )
+                .animation(.spring(response: 0.35, dampingFraction: 0.86), value: selectedPage)
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-            .frame(height: 140)
+            .clipped()
             
-            // Dot Indicators
-            HStack(spacing: 6) {
+            // Minimal dot indicators overlaid at bottom
+            HStack(spacing: 5) {
                 ForEach(0..<2, id: \.self) { index in
-                    Circle()
-                        .fill(index == selectedPage ? colors.accent : Color.saldoSecondary.opacity(0.25))
-                        .frame(width: index == selectedPage ? 7 : 6, height: index == selectedPage ? 7 : 6)
-                        .animation(.easeInOut(duration: 0.2), value: selectedPage)
+                    Capsule()
+                        .fill(index == selectedPage ? colors.accent : colors.primary.opacity(0.15))
+                        .frame(width: index == selectedPage ? 16 : 6, height: 6)
                 }
             }
-            .padding(.bottom, 16)
+            .animation(.spring(response: 0.3, dampingFraction: 0.8), value: selectedPage)
+            .padding(.bottom, 12)
         }
+        .frame(height:160)
         .liquidGlass(cornerRadius: 24, material: .regular, shadowColor: colors.accent)
     }
 }
