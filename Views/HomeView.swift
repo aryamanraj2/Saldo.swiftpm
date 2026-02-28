@@ -27,6 +27,7 @@ struct HomeView: View {
     
     // Subscription Data
     @State private var subscriptions: [SubscriptionItem] = []
+    @State private var editingSubscription: SubscriptionItem?
     
     // Grail Data
     @State private var grailStore = GrailStore()
@@ -289,6 +290,14 @@ struct HomeView: View {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                         showCamera = true
                     }
+                },
+                onSubscriptionTapped: { subscription in
+                    withAnimation(.easeOut(duration: 0.25)) {
+                        showScannerSheet = false
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        editingSubscription = subscription
+                    }
                 }
             )
         }
@@ -362,6 +371,27 @@ struct HomeView: View {
             AddSubscriptionSheet(colors: colors) { newSubscription in
                 subscriptions.append(newSubscription)
             }
+        }
+        // Edit Subscription Sheet
+        .sheet(item: $editingSubscription, onDismiss: {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                withAnimation(.easeOut(duration: 0.3)) {
+                    showScannerSheet = true
+                }
+            }
+        }) { subscription in
+            EditSubscriptionSheet(
+                colors: colors,
+                subscription: subscription,
+                onSave: { updated in
+                    if let index = subscriptions.firstIndex(where: { $0.id == updated.id }) {
+                        subscriptions[index] = updated
+                    }
+                },
+                onRemove: { id in
+                    subscriptions.removeAll(where: { $0.id == id })
+                }
+            )
         }
         // Manual Payment Sheet
         .sheet(isPresented: $showManualPaymentSheet, onDismiss: {

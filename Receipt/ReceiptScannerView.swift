@@ -41,6 +41,9 @@ struct ScannerSheetContainer: View {
     
     // Callback to dismiss sheet and then show camera
     var onScanReceipt: (() -> Void)? = nil
+
+    // Callback when a subscription is tapped for editing
+    var onSubscriptionTapped: ((SubscriptionItem) -> Void)? = nil
     
     // Check if document scanning is supported
     private var isDocumentScanningSupported: Bool {
@@ -67,7 +70,8 @@ struct ScannerSheetContainer: View {
                             }
                         },
                         onAddPaymentTap: onAddPayment,
-                        onAddSubscription: onAddSubscription
+                        onAddSubscription: onAddSubscription,
+                        onSubscriptionTapped: onSubscriptionTapped
                     )
                     // Read the Sheet's Geometry
                     .overlay {
@@ -121,6 +125,7 @@ struct ScannerSheetContent: View {
     var onScanTap: () -> Void
     var onAddPaymentTap: (() -> Void)? = nil
     var onAddSubscription: (() -> Void)? = nil
+    var onSubscriptionTapped: ((SubscriptionItem) -> Void)? = nil
 
     var body: some View {
         VStack(spacing: 0) {
@@ -130,13 +135,14 @@ struct ScannerSheetContent: View {
                 .padding(.top, 12)
                 .padding(.bottom, selectedDetent == .scannerSmall ? 12 : 16)
                 .tutorialHighlight(.scanReceipt)
-            
+
             // MARK: - Expanded Content (Only in Medium Detent)
             if selectedDetent != .scannerSmall {
                 ExpandedSheetContent(
                     colors: colors,
                     subscriptions: subscriptions,
-                    onAddSubscription: onAddSubscription
+                    onAddSubscription: onAddSubscription,
+                    onSubscriptionTapped: onSubscriptionTapped
                 )
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
@@ -232,7 +238,8 @@ struct ExpandedSheetContent: View {
     var colors: ThemeColors
     var subscriptions: [SubscriptionItem] = []
     var onAddSubscription: (() -> Void)? = nil
-    
+    var onSubscriptionTapped: ((SubscriptionItem) -> Void)? = nil
+
     var body: some View {
         VStack(spacing: 0) {
             // Subscription Section Header
@@ -241,9 +248,9 @@ struct ExpandedSheetContent: View {
                     .font(.headline)
                     .fontWeight(.bold)
                     .foregroundStyle(Color.saldoPrimary)
-                
+
                 Spacer()
-                
+
                 // Plus button to add subscription
                 Button(action: {
                     onAddSubscription?()
@@ -257,9 +264,9 @@ struct ExpandedSheetContent: View {
             .padding(.horizontal, 20)
             .padding(.top, 8)
             .padding(.bottom, 12)
-            
+
             // Subscription Grid (shows actual subscriptions or placeholders)
-            SubscriptionGrid(subscriptions: subscriptions, colors: colors)
+            SubscriptionGrid(subscriptions: subscriptions, colors: colors, onSubscriptionTapped: onSubscriptionTapped)
                 .tutorialHighlight(.grills)
             
             Spacer()
@@ -271,7 +278,8 @@ struct ExpandedSheetContent: View {
 struct SubscriptionGrid: View {
     var subscriptions: [SubscriptionItem]
     var colors: ThemeColors
-    
+    var onSubscriptionTapped: ((SubscriptionItem) -> Void)? = nil
+
     private let itemWidth = (UIScreen.main.bounds.width - 56) / 3
     @State private var scrollOffset: CGFloat = 0
     
@@ -294,8 +302,13 @@ struct SubscriptionGrid: View {
                     } else {
                         // Show actual subscriptions
                         ForEach(subscriptions) { subscription in
-                            SubscriptionGridItem(subscription: subscription, colors: colors)
-                                .frame(width: itemWidth)
+                            Button {
+                                onSubscriptionTapped?(subscription)
+                            } label: {
+                                SubscriptionGridItem(subscription: subscription, colors: colors)
+                                    .frame(width: itemWidth)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                 }

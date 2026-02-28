@@ -27,7 +27,7 @@ enum SubscriptionCategory: String, CaseIterable, Identifiable, Codable {
 }
 
 // MARK: - Subscription Item
-struct SubscriptionItem: Identifiable, Equatable, Codable {
+struct SubscriptionItem: Identifiable, Equatable, Hashable, Codable {
     let id: UUID
     var name: String
     var amount: Double
