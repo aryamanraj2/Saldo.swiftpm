@@ -24,7 +24,6 @@ struct HomeView: View {
     @State private var showProfileSheet = false
     @State private var showGrailLimitAlert = false
     @State private var selectedGrailForDetail: GrailPreviewItem?
-    @State private var showGrailDetailSheet = false
     
     // Subscription Data
     @State private var subscriptions: [SubscriptionItem] = []
@@ -109,12 +108,11 @@ struct HomeView: View {
                                         }
                                     },
                                     onGrailTapped: { preview in
-                                        selectedGrailForDetail = preview
                                         withAnimation(.easeOut(duration: 0.25)) {
                                             showScannerSheet = false
                                         }
                                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                                            showGrailDetailSheet = true
+                                            selectedGrailForDetail = preview
                                         }
                                     }
                                 )
@@ -339,20 +337,18 @@ struct HomeView: View {
             }
         }
         // Grail Detail Sheet
-        .sheet(isPresented: $showGrailDetailSheet, onDismiss: {
+        .sheet(item: $selectedGrailForDetail, onDismiss: {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 withAnimation(.easeOut(duration: 0.3)) {
                     showScannerSheet = true
                 }
             }
-        }) {
-            if let preview = selectedGrailForDetail {
-                GrailDetailView(
-                    colors: colors,
-                    grailPreview: preview,
-                    grailStore: grailStore
-                )
-            }
+        }) { preview in
+            GrailDetailView(
+                colors: colors,
+                grailPreview: preview,
+                grailStore: grailStore
+            )
         }
         // Add Subscription Sheet (for subscription plus button in scanner sheet)
         .sheet(isPresented: $showAddSubscriptionSheet, onDismiss: {
