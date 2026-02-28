@@ -180,240 +180,211 @@ struct TotalSavedCard: View {
     }
 }
 
-// MARK: - Consistency Widget (Page 3 of Swipeable Balance)
+// MARK: - Cached Month Data (computed once per appear, not per frame)
+struct CachedMonthData: Equatable {
+    let daysInMonth: Int
+    let startOffset: Int
+    let rows: Int
+    let todayDay: Int
+    let monthName: String
+    let loggedCount: Int
+    let streak: Int
+    let loggedSet: Set<Int>
+
+    static func compute() -> CachedMonthData {
+        let cal = Calendar.current
+        let now = Date()
+        let today = cal.startOfDay(for: now)
+        let comps = cal.dateComponents([.year, .month], from: today)
+        let monthStart = cal.date(from: comps)!
+        let days = cal.range(of: .day, in: .month, for: today)!.count
+        let offset = cal.component(.weekday, from: monthStart) - 1
+        let rowCount = Int(ceil(Double(offset + days) / 7.0))
+        let todayD = cal.component(.day, from: today)
+        let f = DateFormatter(); f.dateFormat = "MMMM"
+
+        // Mock: logged if day % 3 != 0 (replace with real data later)
+        var logged = Set<Int>()
+        for d in 1...todayD where d % 3 != 0 { logged.insert(d) }
+
+        var streak = 0
+        for d in stride(from: todayD, through: 1, by: -1) {
+            if d % 3 != 0 { streak += 1 } else { break }
+        }
+
+        return CachedMonthData(
+            daysInMonth: days,
+            startOffset: offset,
+            rows: rowCount,
+            todayDay: todayD,
+            monthName: f.string(from: today),
+            loggedCount: logged.count,
+            streak: streak,
+            loggedSet: logged
+        )
+    }
+}
+
+// MARK: - Consistency Widget (Page 3 – GPU-Optimised)
 struct ConsistencyWidget: View {
     var colors: ThemeColors
     @Environment(\.colorScheme) var colorScheme
+    @State private var data = CachedMonthData.compute()
 
-    // MARK: Month Helpers
-    private var calendar: Calendar { Calendar.current }
-
-    private var today: Date { calendar.startOfDay(for: Date()) }
-
-    private var currentMonthStart: Date {
-        let comps = calendar.dateComponents([.year, .month], from: today)
-        return calendar.date(from: comps)!
-    }
-
-    /// Number of days in the current month (28 / 29 / 30 / 31)
-    private var daysInMonth: Int {
-        calendar.range(of: .day, in: .month, for: today)!.count
-    }
-
-    /// Weekday of the 1st (1 = Sun … 7 = Sat), converted to 0-based index
-    private var startOffset: Int {
-        calendar.component(.weekday, from: currentMonthStart) - 1
-    }
-
-    /// Number of grid rows needed
-    private var rows: Int {
-        Int(ceil(Double(startOffset + daysInMonth) / 7.0))
-    }
-
-    private var monthName: String {
-        let f = DateFormatter()
-        f.dateFormat = "MMMM"
-        return f.string(from: today)
-    }
-
-    private var todayDay: Int { calendar.component(.day, from: today) }
-
-    // Mock: a day is "logged" if dayOfMonth % 3 != 0
-    private func isLogged(_ day: Int) -> Bool { day % 3 != 0 }
-
-    private var loggedCount: Int {
-        (1...todayDay).filter { isLogged($0) }.count
-    }
-
-    private var currentStreak: Int {
-        var streak = 0
-        for d in stride(from: todayDay, through: 1, by: -1) {
-            if isLogged(d) { streak += 1 } else { break }
-        }
-        return streak
-    }
-
-    // MARK: Body
     var body: some View {
         GeometryReader { geo in
-            let pad: CGFloat      = 16          // symmetric horizontal & top padding
-            let botPad: CGFloat   = 30          // space for dot indicator
-            let headerH: CGFloat  = 28          // title row
-            let dowH: CGFloat     = 10          // day-of-week labels row
-            let vGap: CGFloat     = 5           // spacing blocks
-            let cellGap: CGFloat  = 3           // gap between cells
+            let pad: CGFloat     = 16
+            let botPad: CGFloat  = 28
+            let headerH: CGFloat = 28
+            let dowH: CGFloat    = 12
+            let vGap: CGFloat    = 4
+            let cellGap: CGFloat = 3
 
-            let availW = geo.size.width - pad * 2
-            let availH = geo.size.height - pad - botPad - headerH - dowH - vGap * 3
+            let availW = geo.size.width  - pad * 2
+            let availH = geo.size.height - pad - botPad - headerH - dowH - vGap * 2
 
-            let cols = 7
+            let cols  = 7
             let cellW = (availW - cellGap * CGFloat(cols - 1)) / CGFloat(cols)
-            let cellH = (availH - cellGap * CGFloat(rows - 1)) / CGFloat(rows)
+            let cellH = (availH - cellGap * CGFloat(data.rows - 1)) / CGFloat(data.rows)
 
             VStack(alignment: .leading, spacing: 0) {
-
-                // ── Header (matches style of other two cards)
-                HStack(alignment: .center) {
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("Consistency")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundStyle(Color.saldoSecondary)
-                        Text("\(loggedCount) days logged · \(monthName)")
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(Color.saldoSecondary.opacity(0.55))
-                    }
-                    Spacer()
-                    // Streak badge – same accent treatment as other cards
-                    HStack(spacing: 3) {
-                        Image(systemName: "flame.fill")
-                            .font(.system(size: 10, weight: .bold))
-                        Text("\(currentStreak)d")
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
-                    }
-                    .foregroundStyle(colors.accent)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(
-                        Capsule()
-                            .fill(colors.accent.opacity(0.15))
-                            .overlay(
-                                Capsule().stroke(colors.accent.opacity(0.25), lineWidth: 0.5)
-                            )
-                    )
-                }
-                .frame(height: headerH)
+                // ── Header
+                consistencyHeader
+                    .frame(height: headerH)
 
                 Spacer(minLength: vGap)
 
-                // ── Day-of-week labels (S M T W T F S)
-                let dayLabels = ["S","M","T","W","T","F","S"]
-                HStack(spacing: cellGap) {
-                    ForEach(Array(dayLabels.enumerated()), id: \.offset) { _, label in
-                        Text(label)
-                            .font(.system(size: 8, weight: .semibold))
-                            .foregroundStyle(Color.saldoSecondary.opacity(0.4))
-                            .frame(width: cellW)
-                    }
-                }
-                .frame(height: dowH)
+                // ── Day-of-week labels
+                dayOfWeekLabels(cellW: cellW, cellGap: cellGap)
+                    .frame(height: dowH)
 
                 Spacer(minLength: vGap)
 
-                // ── Month Grid
-                VStack(alignment: .leading, spacing: cellGap) {
-                    ForEach(0..<rows, id: \.self) { row in
-                        HStack(spacing: cellGap) {
-                            ForEach(0..<cols, id: \.self) { col in
-                                let idx     = row * cols + col
-                                let dayNum  = idx - startOffset + 1
-                                let valid   = dayNum >= 1 && dayNum <= daysInMonth
-                                let isFuture = valid && dayNum > todayDay
-                                let isToday  = valid && dayNum == todayDay
-                                let logged   = valid && !isFuture && isLogged(dayNum)
-
-                                if valid {
-                                    ConsistencyCell(
-                                        logged: logged,
-                                        isToday: isToday,
-                                        isFuture: isFuture,
-                                        colors: colors,
-                                        size: CGSize(width: cellW, height: cellH)
-                                    )
-                                } else {
-                                    Color.clear
-                                        .frame(width: cellW, height: cellH)
-                                }
-                            }
-                        }
-                    }
-                }
+                // ── Grid (Metal-rasterised via drawingGroup)
+                consistencyGrid(
+                    cellW: cellW, cellH: cellH,
+                    cellGap: cellGap, cols: cols
+                )
+                .drawingGroup()  // Rasterise into single Metal texture
             }
             .padding(.horizontal, pad)
             .padding(.top, pad)
             .padding(.bottom, botPad)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onAppear { data = CachedMonthData.compute() }
     }
-}
 
-// MARK: - Individual Consistency Cell
-struct ConsistencyCell: View {
-    var logged: Bool
-    var isToday: Bool
-    var isFuture: Bool
-    var colors: ThemeColors
-    var size: CGSize
-    @Environment(\.colorScheme) var colorScheme
+    // MARK: Sub-views
 
-    var body: some View {
-        let r = min(size.width, size.height) * 0.3
-
-        ZStack {
-            if logged {
-                // Active: accent gradient with glassy sheen
-                RoundedRectangle(cornerRadius: r, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                colors.accent.opacity(0.92),
-                                colors.accent.opacity(0.58)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: r, style: .continuous)
-                            .fill(
-                                LinearGradient(
-                                    colors: [.white.opacity(0.32), .clear],
-                                    startPoint: .topLeading,
-                                    endPoint: .center
-                                )
-                            )
-                    )
-                    .shadow(
-                        color: colors.accent.opacity(isToday ? 0.65 : 0.25),
-                        radius: isToday ? 4 : 1.5, x: 0, y: 1
-                    )
-
-            } else if isFuture {
-                // Future: nearly invisible, just a hairline
-                RoundedRectangle(cornerRadius: r, style: .continuous)
-                    .fill(
-                        colorScheme == .dark
-                            ? Color.white.opacity(0.03)
-                            : Color.black.opacity(0.03)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: r, style: .continuous)
-                            .stroke(Color.white.opacity(0.06), lineWidth: 0.5)
-                    )
-            } else {
-                // Inactive past: muted glass
-                RoundedRectangle(cornerRadius: r, style: .continuous)
-                    .fill(
-                        colorScheme == .dark
-                            ? Color.white.opacity(0.07)
-                            : Color.black.opacity(0.08)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: r, style: .continuous)
-                            .stroke(
-                                Color.white.opacity(colorScheme == .dark ? 0.1 : 0.15),
-                                lineWidth: 0.5
-                            )
-                    )
+    private var consistencyHeader: some View {
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Consistency")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundStyle(Color.saldoSecondary)
+                Text("\(data.loggedCount) days logged · \(data.monthName)")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(Color.saldoSecondary.opacity(0.55))
             }
+            Spacer()
+            HStack(spacing: 3) {
+                Image(systemName: "flame.fill")
+                    .font(.system(size: 10, weight: .bold))
+                Text("\(data.streak)d")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+            }
+            .foregroundStyle(colors.accent)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                Capsule()
+                    .fill(colors.accent.opacity(0.15))
+                    .overlay(
+                        Capsule().stroke(colors.accent.opacity(0.25), lineWidth: 0.5)
+                    )
+            )
+        }
+    }
 
-            // Today: accent ring
-            if isToday {
-                RoundedRectangle(cornerRadius: r, style: .continuous)
-                    .stroke(colors.accent, lineWidth: 1.3)
+    private func dayOfWeekLabels(cellW: CGFloat, cellGap: CGFloat) -> some View {
+        HStack(spacing: cellGap) {
+            ForEach(0..<7, id: \.self) { i in
+                Text(["S","M","T","W","T","F","S"][i])
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundStyle(Color.saldoSecondary.opacity(0.4))
+                    .frame(width: cellW)
             }
         }
-        .frame(width: size.width, height: size.height)
+    }
+
+    private func consistencyGrid(cellW: CGFloat, cellH: CGFloat, cellGap: CGFloat, cols: Int) -> some View {
+        VStack(alignment: .leading, spacing: cellGap) {
+            ForEach(0..<data.rows, id: \.self) { row in
+                HStack(spacing: cellGap) {
+                    ForEach(0..<cols, id: \.self) { col in
+                        let dayNum = row * cols + col - data.startOffset + 1
+                        cellView(dayNum: dayNum, cellW: cellW, cellH: cellH)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func cellView(dayNum: Int, cellW: CGFloat, cellH: CGFloat) -> some View {
+        let valid   = dayNum >= 1 && dayNum <= data.daysInMonth
+        let future  = valid && dayNum > data.todayDay
+        let today   = valid && dayNum == data.todayDay
+        let logged  = valid && !future && data.loggedSet.contains(dayNum)
+        let r       = min(cellW, cellH) * 0.3
+        let isDark  = colorScheme == .dark
+
+        if valid {
+            RoundedRectangle(cornerRadius: r, style: .continuous)
+                .fill(cellFill(logged: logged, future: future, isDark: isDark))
+                .overlay(
+                    logged
+                        ? RoundedRectangle(cornerRadius: r, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    stops: [
+                                        .init(color: .white.opacity(0.28), location: 0),
+                                        .init(color: .clear, location: 0.45)
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                        : nil
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: r, style: .continuous)
+                        .stroke(
+                            today
+                                ? colors.accent
+                                : (!logged && !future
+                                    ? Color.white.opacity(isDark ? 0.08 : 0.12)
+                                    : Color.clear),
+                            lineWidth: today ? 1.3 : 0.5
+                        )
+                )
+                .frame(width: cellW, height: cellH)
+        } else {
+            Color.clear.frame(width: cellW, height: cellH)
+        }
+    }
+
+    // Flat fill — zero shadows, zero per-cell blur
+    private func cellFill(logged: Bool, future: Bool, isDark: Bool) -> Color {
+        if logged {
+            return colors.accent.opacity(0.78)
+        } else if future {
+            return isDark ? Color.white.opacity(0.03) : Color.black.opacity(0.03)
+        } else {
+            return isDark ? Color.white.opacity(0.07) : Color.black.opacity(0.06)
+        }
     }
 }
 
