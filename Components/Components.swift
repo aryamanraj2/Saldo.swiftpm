@@ -180,42 +180,283 @@ struct TotalSavedCard: View {
     }
 }
 
+// MARK: - Consistency Widget (Page 3 of Swipeable Balance)
+struct ConsistencyWidget: View {
+    var colors: ThemeColors
+    @Environment(\.colorScheme) var colorScheme
+
+    // MARK: Month Helpers
+    private var calendar: Calendar { Calendar.current }
+
+    private var today: Date { calendar.startOfDay(for: Date()) }
+
+    private var currentMonthStart: Date {
+        let comps = calendar.dateComponents([.year, .month], from: today)
+        return calendar.date(from: comps)!
+    }
+
+    /// Number of days in the current month (28 / 29 / 30 / 31)
+    private var daysInMonth: Int {
+        calendar.range(of: .day, in: .month, for: today)!.count
+    }
+
+    /// Weekday of the 1st (1 = Sun … 7 = Sat), converted to 0-based index
+    private var startOffset: Int {
+        calendar.component(.weekday, from: currentMonthStart) - 1
+    }
+
+    /// Number of grid rows needed
+    private var rows: Int {
+        Int(ceil(Double(startOffset + daysInMonth) / 7.0))
+    }
+
+    private var monthName: String {
+        let f = DateFormatter()
+        f.dateFormat = "MMMM"
+        return f.string(from: today)
+    }
+
+    private var todayDay: Int { calendar.component(.day, from: today) }
+
+    // Mock: a day is "logged" if dayOfMonth % 3 != 0
+    private func isLogged(_ day: Int) -> Bool { day % 3 != 0 }
+
+    private var loggedCount: Int {
+        (1...todayDay).filter { isLogged($0) }.count
+    }
+
+    private var currentStreak: Int {
+        var streak = 0
+        for d in stride(from: todayDay, through: 1, by: -1) {
+            if isLogged(d) { streak += 1 } else { break }
+        }
+        return streak
+    }
+
+    // MARK: Body
+    var body: some View {
+        GeometryReader { geo in
+            let pad: CGFloat      = 16          // symmetric horizontal & top padding
+            let botPad: CGFloat   = 30          // space for dot indicator
+            let headerH: CGFloat  = 28          // title row
+            let dowH: CGFloat     = 10          // day-of-week labels row
+            let vGap: CGFloat     = 5           // spacing blocks
+            let cellGap: CGFloat  = 3           // gap between cells
+
+            let availW = geo.size.width - pad * 2
+            let availH = geo.size.height - pad - botPad - headerH - dowH - vGap * 3
+
+            let cols = 7
+            let cellW = (availW - cellGap * CGFloat(cols - 1)) / CGFloat(cols)
+            let cellH = (availH - cellGap * CGFloat(rows - 1)) / CGFloat(rows)
+
+            VStack(alignment: .leading, spacing: 0) {
+
+                // ── Header (matches style of other two cards)
+                HStack(alignment: .center) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Consistency")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundStyle(Color.saldoSecondary)
+                        Text("\(loggedCount) days logged · \(monthName)")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(Color.saldoSecondary.opacity(0.55))
+                    }
+                    Spacer()
+                    // Streak badge – same accent treatment as other cards
+                    HStack(spacing: 3) {
+                        Image(systemName: "flame.fill")
+                            .font(.system(size: 10, weight: .bold))
+                        Text("\(currentStreak)d")
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                    }
+                    .foregroundStyle(colors.accent)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(colors.accent.opacity(0.15))
+                            .overlay(
+                                Capsule().stroke(colors.accent.opacity(0.25), lineWidth: 0.5)
+                            )
+                    )
+                }
+                .frame(height: headerH)
+
+                Spacer(minLength: vGap)
+
+                // ── Day-of-week labels (S M T W T F S)
+                let dayLabels = ["S","M","T","W","T","F","S"]
+                HStack(spacing: cellGap) {
+                    ForEach(Array(dayLabels.enumerated()), id: \.offset) { _, label in
+                        Text(label)
+                            .font(.system(size: 8, weight: .semibold))
+                            .foregroundStyle(Color.saldoSecondary.opacity(0.4))
+                            .frame(width: cellW)
+                    }
+                }
+                .frame(height: dowH)
+
+                Spacer(minLength: vGap)
+
+                // ── Month Grid
+                VStack(alignment: .leading, spacing: cellGap) {
+                    ForEach(0..<rows, id: \.self) { row in
+                        HStack(spacing: cellGap) {
+                            ForEach(0..<cols, id: \.self) { col in
+                                let idx     = row * cols + col
+                                let dayNum  = idx - startOffset + 1
+                                let valid   = dayNum >= 1 && dayNum <= daysInMonth
+                                let isFuture = valid && dayNum > todayDay
+                                let isToday  = valid && dayNum == todayDay
+                                let logged   = valid && !isFuture && isLogged(dayNum)
+
+                                if valid {
+                                    ConsistencyCell(
+                                        logged: logged,
+                                        isToday: isToday,
+                                        isFuture: isFuture,
+                                        colors: colors,
+                                        size: CGSize(width: cellW, height: cellH)
+                                    )
+                                } else {
+                                    Color.clear
+                                        .frame(width: cellW, height: cellH)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, pad)
+            .padding(.top, pad)
+            .padding(.bottom, botPad)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// MARK: - Individual Consistency Cell
+struct ConsistencyCell: View {
+    var logged: Bool
+    var isToday: Bool
+    var isFuture: Bool
+    var colors: ThemeColors
+    var size: CGSize
+    @Environment(\.colorScheme) var colorScheme
+
+    var body: some View {
+        let r = min(size.width, size.height) * 0.3
+
+        ZStack {
+            if logged {
+                // Active: accent gradient with glassy sheen
+                RoundedRectangle(cornerRadius: r, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                colors.accent.opacity(0.92),
+                                colors.accent.opacity(0.58)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: r, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: [.white.opacity(0.32), .clear],
+                                    startPoint: .topLeading,
+                                    endPoint: .center
+                                )
+                            )
+                    )
+                    .shadow(
+                        color: colors.accent.opacity(isToday ? 0.65 : 0.25),
+                        radius: isToday ? 4 : 1.5, x: 0, y: 1
+                    )
+
+            } else if isFuture {
+                // Future: nearly invisible, just a hairline
+                RoundedRectangle(cornerRadius: r, style: .continuous)
+                    .fill(
+                        colorScheme == .dark
+                            ? Color.white.opacity(0.03)
+                            : Color.black.opacity(0.03)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: r, style: .continuous)
+                            .stroke(Color.white.opacity(0.06), lineWidth: 0.5)
+                    )
+            } else {
+                // Inactive past: muted glass
+                RoundedRectangle(cornerRadius: r, style: .continuous)
+                    .fill(
+                        colorScheme == .dark
+                            ? Color.white.opacity(0.07)
+                            : Color.black.opacity(0.08)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: r, style: .continuous)
+                            .stroke(
+                                Color.white.opacity(colorScheme == .dark ? 0.1 : 0.15),
+                                lineWidth: 0.5
+                            )
+                    )
+            }
+
+            // Today: accent ring
+            if isToday {
+                RoundedRectangle(cornerRadius: r, style: .continuous)
+                    .stroke(colors.accent, lineWidth: 1.3)
+            }
+        }
+        .frame(width: size.width, height: size.height)
+    }
+}
+
 // MARK: - Swipeable Balance Card
 struct SwipeableBalanceCard: View {
     var balance: Double
     var colors: ThemeColors
     var onTotalSavedTapped: (() -> Void)? = nil
-    
+
+    private let pageCount = 3
+
     @State private var selectedPage: Int = 0
     @State private var dragOffset: CGFloat = 0
-    
+
     var body: some View {
         ZStack(alignment: .bottom) {
             GeometryReader { geo in
                 let pageWidth = geo.size.width
-                
+
                 HStack(spacing: 0) {
                     // Page 1: Remaining Balance
                     BalanceCardContent(balance: balance, colors: colors)
                         .frame(width: pageWidth)
-                    
+
                     // Page 2: Total Saved
                     TotalSavedCard(colors: colors)
                         .frame(width: pageWidth)
                         .contentShape(Rectangle())
-                        .onTapGesture {
-                            onTotalSavedTapped?()
-                        }
+                        .onTapGesture { onTotalSavedTapped?() }
+
+                    // Page 3: Consistency Widget
+                    ConsistencyWidget(colors: colors)
+                        .frame(width: pageWidth)
                 }
                 .offset(x: -CGFloat(selectedPage) * pageWidth + dragOffset)
                 .gesture(
                     DragGesture(minimumDistance: 15)
                         .onChanged { value in
-                            // Resist dragging past edges
                             let translation = value.translation.width
-                            if (selectedPage == 0 && translation > 0) ||
-                               (selectedPage == 1 && translation < 0) {
-                                dragOffset = translation * 0.3 // rubber-band
+                            let atLeadingEdge = selectedPage == 0 && translation > 0
+                            let atTrailingEdge = selectedPage == pageCount - 1 && translation < 0
+                            if atLeadingEdge || atTrailingEdge {
+                                dragOffset = translation * 0.3  // rubber-band
                             } else {
                                 dragOffset = translation
                             }
@@ -223,12 +464,13 @@ struct SwipeableBalanceCard: View {
                         .onEnded { value in
                             let threshold: CGFloat = pageWidth * 0.25
                             let velocity = value.predictedEndTranslation.width
-                            
                             withAnimation(.spring(response: 0.35, dampingFraction: 0.86)) {
-                                if (value.translation.width < -threshold || velocity < -150) && selectedPage == 0 {
-                                    selectedPage = 1
-                                } else if (value.translation.width > threshold || velocity > 150) && selectedPage == 1 {
-                                    selectedPage = 0
+                                if (value.translation.width < -threshold || velocity < -150),
+                                   selectedPage < pageCount - 1 {
+                                    selectedPage += 1
+                                } else if (value.translation.width > threshold || velocity > 150),
+                                          selectedPage > 0 {
+                                    selectedPage -= 1
                                 }
                                 dragOffset = 0
                             }
@@ -237,10 +479,10 @@ struct SwipeableBalanceCard: View {
                 .animation(.spring(response: 0.35, dampingFraction: 0.86), value: selectedPage)
             }
             .clipped()
-            
-            // Minimal dot indicators overlaid at bottom
+
+            // Dot indicators
             HStack(spacing: 5) {
-                ForEach(0..<2, id: \.self) { index in
+                ForEach(0..<pageCount, id: \.self) { index in
                     Capsule()
                         .fill(index == selectedPage ? colors.accent : colors.primary.opacity(0.15))
                         .frame(width: index == selectedPage ? 16 : 6, height: 6)
@@ -249,7 +491,7 @@ struct SwipeableBalanceCard: View {
             .animation(.spring(response: 0.3, dampingFraction: 0.8), value: selectedPage)
             .padding(.bottom, 12)
         }
-        .frame(height:160)
+        .frame(height: 160)
         .liquidGlass(cornerRadius: 24, material: .regular, shadowColor: colors.accent)
     }
 }
