@@ -123,7 +123,8 @@ struct HomeView: View {
                                         }
                                     }
                                 )
-                                
+                                .tutorialHighlight(.grails)
+
                                 WideActionButton(
                                     icon: "apple.intelligence",
                                     title: "Get Insights",

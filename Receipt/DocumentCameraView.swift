@@ -187,7 +187,7 @@ struct ScanResultSheet: View {
     // Editable state pre-populated from OCR
     @State private var merchantName: String = ""
     @State private var amountString: String = ""
-    @State private var selectedDate: Date = Date()
+    @State private var selectedDate: Date = .now
     @State private var selectedCurrency: CurrencyOption = CurrencyOption.options[0]
 
     @FocusState private var focusedField: ScanField?
@@ -453,9 +453,8 @@ struct ScanResultSheet: View {
                 // Strip currency symbols, keep just the number
                 amountString = total.replacingOccurrences(of: "[^0-9.]", with: "", options: .regularExpression)
             }
-            if let date = metadata.date {
-                selectedDate = date
-            }
+            // Always use today's date regardless of what OCR detects
+            selectedDate = .now
             withAnimation(.spring(response: 0.5, dampingFraction: 0.7).delay(0.1)) {
                 appeared = true
             }

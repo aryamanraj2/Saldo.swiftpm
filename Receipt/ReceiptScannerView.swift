@@ -266,7 +266,7 @@ struct ExpandedSheetContent: View {
 
             // Subscription Grid (shows actual subscriptions or placeholders)
             SubscriptionGrid(subscriptions: subscriptions, colors: colors, onSubscriptionTapped: onSubscriptionTapped)
-                .tutorialHighlight(.grills)
+                .tutorialHighlight(.addSubscriptions)
             
             Spacer()
         }

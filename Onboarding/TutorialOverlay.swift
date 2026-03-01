@@ -5,9 +5,20 @@ enum TutorialStep: Int, CaseIterable, Identifiable {
     case remainingBalance = 1
     case getInsights = 2
     case scanReceipt = 3
-    case grills = 4
-    
+    case addSubscriptions = 4
+    case grails = 5
+
     var id: Int { rawValue }
+
+    var description: String {
+        switch self {
+        case .remainingBalance: return "Shows your Remaining Balance"
+        case .getInsights: return "Get Insights from Saldo AI"
+        case .scanReceipt: return "Scan Receipt or Add Transaction"
+        case .addSubscriptions: return "Add Subscriptions"
+        case .grails: return "Add your Wishlist here!"
+        }
+    }
 }
 
 // MARK: - Tutorial Item (Stores captured frame info)
@@ -348,9 +359,17 @@ fileprivate struct TutorialBottomView: View {
     
     var body: some View {
         VStack(spacing: 12) {
-            // Placeholder for explanation text (can be added later)
-            Spacer()
-                .frame(height: 50)
+            // Step description text
+            if !orderedItems.isEmpty, currentIndex < orderedItems.count {
+                Text(orderedItems[currentIndex].id.description)
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                    .foregroundStyle(themeColors.primary)
+                    .multilineTextAlignment(.center)
+                    .contentTransition(.numericText())
+                    .animation(.smooth(duration: 0.35), value: currentIndex)
+                    .padding(.horizontal, 20)
+            }
             
             // Navigation Buttons - Liquid Glass Style
             VStack(spacing: 12) {
@@ -456,11 +475,17 @@ extension View {
                         .clipShape(.rect(cornerRadius: 12))
                         .tutorialHighlight(.scanReceipt)
                     
-                    Text("Grills Section")
+                    Text("Subscriptions")
                         .padding()
                         .background(Color.orange.opacity(0.2))
                         .clipShape(.rect(cornerRadius: 12))
-                        .tutorialHighlight(.grills)
+                        .tutorialHighlight(.addSubscriptions)
+
+                    Text("Grails Wishlist")
+                        .padding()
+                        .background(Color.purple.opacity(0.2))
+                        .clipShape(.rect(cornerRadius: 12))
+                        .tutorialHighlight(.grails)
                 }
             }
             .tutorialOverlay(isActive: $showTutorial) {
