@@ -1,5 +1,4 @@
  import SwiftUI
-import VisionKit
 import PhotosUI
 
 // MARK: - Document Camera with Gallery Picker
@@ -102,63 +101,57 @@ struct DocumentCameraWithGallery: View {
     }
 }
 
-// MARK: - Document Camera View
-/// UIViewControllerRepresentable wrapper for VNDocumentCameraViewController
-/// Provides high-quality document scanning with auto-shutter and perspective correction
+// MARK: - Document Camera View (Single-Capture)
+/// UIViewControllerRepresentable wrapper for UIImagePickerController
+/// Provides single-capture camera for receipt scanning — no multi-page stacking
 struct DocumentCameraView: UIViewControllerRepresentable {
-    
+
     // MARK: - Bindings
     @Binding var scannedImage: UIImage?
     @Binding var isProcessing: Bool
-    
+
     // MARK: - Callbacks
     var onCompletion: (Result<ReceiptMetadata, Error>) -> Void
     var onCancel: () -> Void
-    
+
     // MARK: - UIViewControllerRepresentable
-    func makeUIViewController(context: Context) -> VNDocumentCameraViewController {
-        let controller = VNDocumentCameraViewController()
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let controller = UIImagePickerController()
+        controller.sourceType = .camera
         controller.delegate = context.coordinator
         return controller
     }
-    
-    func updateUIViewController(_ uiViewController: VNDocumentCameraViewController, context: Context) {
-        // No updates needed
-    }
-    
+
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
-    
+
     // MARK: - Coordinator
     @MainActor
-    class Coordinator: NSObject, @preconcurrency VNDocumentCameraViewControllerDelegate {
+    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
         let parent: DocumentCameraView
-        
+
         init(_ parent: DocumentCameraView) {
             self.parent = parent
         }
-        
-        // MARK: - VNDocumentCameraViewControllerDelegate
-        
-        /// Called when user finishes scanning
-        func documentCameraViewController(
-            _ controller: VNDocumentCameraViewController,
-            didFinishWith scan: VNDocumentCameraScan
+
+        /// Called when user captures and confirms a photo
+        func imagePickerController(
+            _ picker: UIImagePickerController,
+            didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
         ) {
-            // Get the first page (receipts are typically single-page)
-            guard scan.pageCount > 0 else {
-                // Let SwiftUI dismiss via onCompletion -> showCamera = false
+            guard let image = info[.originalImage] as? UIImage else {
                 parent.onCompletion(.failure(ReceiptProcessorError.noDocumentFound))
                 return
             }
-            
-            let image = scan.imageOfPage(at: 0)
+
+            print("📷 [Camera] Captured receipt photo: \(Int(image.size.width))x\(Int(image.size.height))")
+
             parent.scannedImage = image
             parent.isProcessing = true
-            
-            // Process the image asynchronously
-            // Do NOT manually dismiss — SwiftUI handles dismissal when onCompletion sets showCamera = false
+
             Task {
                 do {
                     let metadata = try await ReceiptProcessor.shared.process(image: image)
@@ -174,20 +167,10 @@ struct DocumentCameraView: UIViewControllerRepresentable {
                 }
             }
         }
-        
-        /// Called when user cancels scanning
-        func documentCameraViewControllerDidCancel(_ controller: VNDocumentCameraViewController) {
-            // Let SwiftUI dismiss via onCancel -> showCamera = false
+
+        /// Called when user cancels
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
             parent.onCancel()
-        }
-        
-        /// Called when scanning fails
-        func documentCameraViewController(
-            _ controller: VNDocumentCameraViewController,
-            didFailWithError error: Error
-        ) {
-            // Let SwiftUI dismiss via onCompletion -> showCamera = false
-            parent.onCompletion(.failure(error))
         }
     }
 }
@@ -205,9 +188,21 @@ struct ScanResultSheet: View {
     @State private var merchantName: String = ""
     @State private var amountString: String = ""
     @State private var selectedDate: Date = Date()
+    @State private var selectedCurrency: CurrencyOption = CurrencyOption.options[0]
 
     @FocusState private var focusedField: ScanField?
     @State private var appeared = false
+
+    private var currencyIcon: String {
+        switch selectedCurrency.code {
+        case "INR": return "indianrupeesign.circle.fill"
+        case "USD": return "dollarsign.circle.fill"
+        case "EUR": return "eurosign.circle.fill"
+        case "GBP": return "sterlingsign.circle.fill"
+        case "JPY": return "yensign.circle.fill"
+        default: return "dollarsign.circle.fill"
+        }
+    }
 
     private enum ScanField: Hashable {
         case merchant, amount
@@ -257,18 +252,75 @@ struct ScanResultSheet: View {
                         )
                         .focused($focusedField, equals: .merchant)
 
-                        // Amount
-                        EditableDataRow(
-                            label: "Total Amount",
-                            icon: "indianrupeesign.circle.fill",
-                            text: $amountString,
-                            placeholder: "0.00",
-                            colors: colors,
-                            keyboardType: .decimalPad,
-                            isFocused: focusedField == .amount,
-                            onTap: { focusedField = .amount }
+                        // Amount with Currency Picker
+                        HStack(spacing: 12) {
+                            // Currency picker
+                            Menu {
+                                ForEach(CurrencyOption.options) { option in
+                                    Button(action: {
+                                        selectedCurrency = option
+                                    }) {
+                                        HStack {
+                                            Text("\(option.symbol) \(option.code)")
+                                            if selectedCurrency.code == option.code {
+                                                Image(systemName: "checkmark")
+                                            }
+                                        }
+                                    }
+                                }
+                            } label: {
+                                ZStack {
+                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        .fill(colors.accent.opacity(0.12))
+                                        .frame(width: 38, height: 38)
+
+                                    HStack(spacing: 2) {
+                                        Text(selectedCurrency.symbol)
+                                            .font(.system(size: 16, weight: .semibold))
+                                            .foregroundStyle(colors.accent)
+                                        Image(systemName: "chevron.down")
+                                            .font(.system(size: 7, weight: .bold))
+                                            .foregroundStyle(colors.accent.opacity(0.6))
+                                    }
+                                }
+                            }
+
+                            // Label + TextField
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Total Amount")
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                    .foregroundStyle(Color.saldoSecondary)
+
+                                TextField("0.00", text: $amountString)
+                                    .font(.body)
+                                    .fontWeight(.medium)
+                                    .foregroundStyle(Color.saldoPrimary)
+                                    .keyboardType(.decimalPad)
+                                    .focused($focusedField, equals: .amount)
+                                    .onTapGesture { focusedField = .amount }
+                            }
+
+                            Spacer(minLength: 0)
+
+                            Image(systemName: "pencil")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(Color.saldoSecondary.opacity(0.4))
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .fill(Color.saldoSecondary.opacity(0.04))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                        .strokeBorder(
+                                            focusedField == .amount ? colors.accent.opacity(0.4) : Color.clear,
+                                            lineWidth: 1.5
+                                        )
+                                )
                         )
-                        .focused($focusedField, equals: .amount)
+                        .animation(.easeInOut(duration: 0.2), value: focusedField)
 
                         // Date (native iOS DatePicker)
                         DatePickerRow(
@@ -323,9 +375,9 @@ struct ScanResultSheet: View {
                                 return
                             }
 
-                            // Detect currency from receipt OCR or default to primary
+                            // Use user-selected currency from the picker
                             let receiptCurrency = AppCurrency.allCases.first {
-                                $0.rawValue == (metadata.currencyCode ?? "")
+                                $0.rawValue == selectedCurrency.code
                             } ?? CurrencyManager.shared.selected
 
                             let primaryAmount = receiptCurrency.convert(value, to: CurrencyManager.shared.selected)
@@ -389,12 +441,17 @@ struct ScanResultSheet: View {
         .presentationDragIndicator(.visible)
         .modifier(ScanResultSheetEnhancements(cornerRadius: 32))
         .onAppear {
+            // Default currency to user's primary currency
+            let primary = CurrencyManager.shared.selected
+            selectedCurrency = CurrencyOption.options.first { $0.code == primary.rawValue } ?? CurrencyOption.options[0]
+
             // Pre-populate from OCR
             merchantName = metadata.merchantName ?? ""
-            if let total = metadata.formattedTotal {
-                amountString = total
-            } else if let amount = metadata.totalAmount {
+            if let amount = metadata.totalAmount {
                 amountString = "\(amount)"
+            } else if let total = metadata.formattedTotal {
+                // Strip currency symbols, keep just the number
+                amountString = total.replacingOccurrences(of: "[^0-9.]", with: "", options: .regularExpression)
             }
             if let date = metadata.date {
                 selectedDate = date

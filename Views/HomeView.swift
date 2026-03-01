@@ -28,6 +28,7 @@ struct HomeView: View {
     @State private var showManualPaymentSheet = false
     @State private var showProfileSheet = false
     @State private var showGrailLimitAlert = false
+    @State private var showInsights = false
     @State private var selectedGrailForDetail: GrailPreviewItem?
     
     // Subscription Data
@@ -127,7 +128,12 @@ struct HomeView: View {
                                     icon: "apple.intelligence",
                                     title: "Get Insights",
                                     colors: colors,
-                                    action: {}
+                                    action: {
+                                        withAnimation(.easeOut(duration: 0.25)) { showScannerSheet = false }
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                            showInsights = true
+                                        }
+                                    }
                                 )
                                 .tutorialHighlight(.getInsights)
                             }
@@ -226,6 +232,18 @@ struct HomeView: View {
                     }
                 )
                 .toolbarBackground(.hidden, for: .navigationBar)
+                .navigationDestination(isPresented: $showInsights) {
+                    InsightsView(colors: colors, transactionStore: transactionStore)
+                }
+                .onChange(of: showInsights) { _, isShowing in
+                    if !isShowing {
+                        // Returned from Insights — restore scanner sheet
+                        sheetDetent = .scannerSmall
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            withAnimation(.easeIn(duration: 0.25)) { showScannerSheet = true }
+                        }
+                    }
+                }
                 // Document Camera (VisionKit) - presented from NavigationStack to avoid being blocked by scanner sheet
                 .fullScreenCover(isPresented: $showCamera, onDismiss: {
                     // Camera has fully dismissed — restore scanner sheet

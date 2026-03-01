@@ -1,6 +1,5 @@
 import SwiftUI
 import AVFoundation
-import VisionKit
 
 // MARK: - Scanner Sheet State (simplified for native sheet)
 enum ScannerSheetState: Equatable {
@@ -45,9 +44,9 @@ struct ScannerSheetContainer: View {
     // Callback when a subscription is tapped for editing
     var onSubscriptionTapped: ((SubscriptionItem) -> Void)? = nil
     
-    // Check if document scanning is supported
+    // Check if camera is available for receipt scanning
     private var isDocumentScanningSupported: Bool {
-        VNDocumentCameraViewController.isSupported
+        UIImagePickerController.isSourceTypeAvailable(.camera)
     }
     
     var body: some View {
