@@ -437,7 +437,7 @@ extension View {
         var body: some View {
             ZStack {
                 VStack(spacing: 20) {
-                    Text("Balance: ₹4,500")
+                    Text("Balance: \(CurrencyManager.shared.symbol)4,500")
                         .font(.largeTitle)
                         .padding()
                         .background(Color.gray.opacity(0.2))

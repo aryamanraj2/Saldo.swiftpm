@@ -336,7 +336,7 @@ private struct EditSubscriptionSheetEnhancements: ViewModifier {
                 subscription: SubscriptionItem(
                     name: "Spotify",
                     amount: 119.0,
-                    currency: "₹",
+                    currency: CurrencyManager.shared.symbol,
                     category: .music
                 )
             )

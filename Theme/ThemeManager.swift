@@ -103,10 +103,11 @@ enum AppTheme: Equatable {
         }
     }
     
-    static func from(balance: Double) -> AppTheme {
-        if balance < 1000 {
+    @MainActor static func from(balance: Double) -> AppTheme {
+        let currency = CurrencyManager.shared.selected
+        if balance < currency.dangerThreshold {
             return .danger
-        } else if balance < 5000 {
+        } else if balance < currency.moderateThreshold {
             return .moderate
         } else {
             return .wealthy

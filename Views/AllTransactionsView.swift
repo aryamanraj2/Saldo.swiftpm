@@ -22,11 +22,11 @@ struct TransactionItem: Identifiable {
         let prefix = type == .income ? "+" : ""
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
-        formatter.currencySymbol = "₹"
+        formatter.currencySymbol = AppCurrency.currentSymbol
         formatter.maximumFractionDigits = 2
         formatter.minimumFractionDigits = 2
         
-        let formattedString = formatter.string(from: NSNumber(value: amount)) ?? "₹\(amount)"
+        let formattedString = formatter.string(from: NSNumber(value: amount)) ?? "\(AppCurrency.currentSymbol)\(amount)"
         return "\(prefix)\(formattedString)"
     }
 }

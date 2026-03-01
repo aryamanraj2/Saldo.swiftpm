@@ -796,7 +796,7 @@ private struct GrailDetailSheetEnhancements: ViewModifier {
             image: nil,
             targetAmount: 15000,
             currentAmount: 5000,
-            currency: "₹"
+            currency: CurrencyManager.shared.symbol
         ),
         grailStore: GrailStore()
     )

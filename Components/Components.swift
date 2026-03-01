@@ -122,7 +122,7 @@ struct BalanceCard: View {
                 .fontWeight(.medium)
                 .foregroundStyle(Color.saldoSecondary)
             
-            Text("₹\(balance, format: .number.precision(.fractionLength(2)))")
+            Text("\(CurrencyManager.shared.symbol)\(balance, format: .number.precision(.fractionLength(2)))")
                 .contentTransition(.numericText()) // Smooth number transition
                 .font(.system(size: 48, weight: .bold, design: .rounded))
                 .foregroundStyle(colors.primary)
@@ -162,7 +162,7 @@ struct TotalSavedCard: View {
                     .foregroundStyle(Color.saldoSecondary.opacity(0.5))
             }
             
-            Text("₹\(totalSaved, format: .number.precision(.fractionLength(2)))")
+            Text("\(CurrencyManager.shared.symbol)\(totalSaved, format: .number.precision(.fractionLength(2)))")
                 .contentTransition(.numericText())
                 .font(.system(size: 48, weight: .bold, design: .rounded))
                 .foregroundStyle(colors.primary)
@@ -479,7 +479,7 @@ struct BalanceCardContent: View {
                 .fontWeight(.medium)
                 .foregroundStyle(Color.saldoSecondary)
             
-            Text("₹\(balance, format: .number.precision(.fractionLength(2)))")
+            Text("\(CurrencyManager.shared.symbol)\(balance, format: .number.precision(.fractionLength(2)))")
                 .contentTransition(.numericText())
                 .font(.system(size: 48, weight: .bold, design: .rounded))
                 .foregroundStyle(colors.primary)
@@ -551,10 +551,11 @@ enum SpendPeriod: String, CaseIterable {
     }
     
     var amount: String {
+        let s = AppCurrency.currentSymbol
         switch self {
-        case .day: return "₹450"
-        case .week: return "₹1,500"
-        case .month: return "₹6,200"
+        case .day: return "\(s)450"
+        case .week: return "\(s)1,500"
+        case .month: return "\(s)6,200"
         }
     }
     
@@ -1293,7 +1294,7 @@ struct TransactionRow: View {
     var icon: String = "cart.fill"
     var title: String = "Unknown"
     var subtitle: String = "Just now"
-    var amount: String = "₹0.00"
+    var amount: String = "$0.00"
     var colors: ThemeColors
     @Environment(\.colorScheme) var colorScheme
 

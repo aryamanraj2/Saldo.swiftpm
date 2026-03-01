@@ -150,9 +150,9 @@ struct HomeView: View {
                             .padding(.horizontal, 20)
                             
                             VStack(spacing: 8) {
-                                TransactionRow(icon: "basket.fill", title: "Grocery", subtitle: "5:30 PM", amount: "₹450.00", colors: colors)
-                                TransactionRow(icon: "music.note", title: "Spotify", subtitle: "Yesterday", amount: "₹119.00", colors: colors)
-                                TransactionRow(icon: "cup.and.saucer.fill", title: "Starbucks", subtitle: "Yesterday", amount: "₹350.00", colors: colors)
+                                TransactionRow(icon: "basket.fill", title: "Grocery", subtitle: "5:30 PM", amount: "\(CurrencyManager.shared.symbol)450.00", colors: colors)
+                                TransactionRow(icon: "music.note", title: "Spotify", subtitle: "Yesterday", amount: "\(CurrencyManager.shared.symbol)119.00", colors: colors)
+                                TransactionRow(icon: "cup.and.saucer.fill", title: "Starbucks", subtitle: "Yesterday", amount: "\(CurrencyManager.shared.symbol)350.00", colors: colors)
                             }
                             .padding(.horizontal, 20)
                         }
@@ -160,7 +160,7 @@ struct HomeView: View {
                         
                         // DEBUG CONTROLS
                         VStack(spacing: 10) {
-                            Text("Debug Balance: ₹\(Int(balance))")
+                            Text("Debug Balance: \(CurrencyManager.shared.symbol)\(Int(balance))")
                                 .font(.caption)
                                 .foregroundStyle(Color.secondary)
                             

@@ -96,9 +96,9 @@ struct ProfileSheet: View {
     private var allowanceSection: some View {
         ProfileSectionCard(colors: colors) {
             VStack(alignment: .leading, spacing: 10) {
-                SectionLabel(text: "Monthly Allowance", icon: "indianrupeesign.circle.fill", colors: colors)
+                SectionLabel(text: "Monthly Allowance", icon: "banknote.fill", colors: colors)
                 HStack(spacing: 10) {
-                    Text("₹")
+                    Text(CurrencyManager.shared.symbol)
                         .font(.title3).fontWeight(.semibold).foregroundStyle(colors.accent)
                         .frame(width: 44, height: 44)
                         .background {

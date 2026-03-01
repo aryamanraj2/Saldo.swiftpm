@@ -8,15 +8,15 @@ struct OnboardingView: View {
 
     // Slide state
     @State private var currentPage = 0
+    @State private var minPage = 0
 
     // User data
     @State private var userName = ""
     @FocusState private var isNameFieldFocused: Bool
 
     // User financial data
-    @State private var allowance = 5000
-    @State private var spending = 3000
-    @State private var currentBalance = 2000
+    @State private var allowance = CurrencyManager.shared.selected.defaultAllowance
+    @State private var spending = CurrencyManager.shared.selected.defaultSpending
 
     // Animation
     @Namespace private var namespace
@@ -36,10 +36,8 @@ struct OnboardingView: View {
         case 2:
             // Invert logic for spending: higher spending = danger, lower = wealthy
             return AppTheme.fromSpending(spending: Double(spending), maxSpending: Double(allowance))
-        case 3:
-            return AppTheme.from(balance: Double(currentBalance))
         default:
-            return AppTheme.from(balance: Double(currentBalance))
+            return .wealthy
         }
     }
 
@@ -73,7 +71,8 @@ struct OnboardingView: View {
                         question: "How much is your allowance?",
                         value: $allowance,
                         icon: "wallet.bifold.fill",
-                        subtitle: "Your monthly income or pocket money"
+                        subtitle: "Your monthly income or pocket money",
+                        showCurrencyHint: true
                     )
                     .tag(1)
 
@@ -87,17 +86,16 @@ struct OnboardingView: View {
                         themeOverride: AppTheme.fromSpending(spending: Double(spending), maxSpending: Double(allowance))
                     )
                     .tag(2)
-
-                    // Page 3: Balance
-                    slideContent(
-                        question: "What's your current balance?",
-                        value: $currentBalance,
-                        icon: "indianrupeesign.circle.fill",
-                        subtitle: "The amount you have right now"
-                    )
-                    .tag(3)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
+                .onChange(of: currentPage) { _, newValue in
+                    // Prevent backward navigation past the minimum allowed page
+                    if newValue < minPage {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            currentPage = minPage
+                        }
+                    }
+                }
 
                 
                 // Bottom controls
@@ -164,6 +162,7 @@ struct OnboardingView: View {
                             withAnimation(.easeInOut(duration: 0.4)) {
                                 currentPage += 1
                             }
+                            minPage = currentPage
                             let generator = UIImpactFeedbackGenerator(style: .medium)
                             generator.impactOccurred()
                         }
@@ -197,9 +196,13 @@ struct OnboardingView: View {
         value: Binding<Int>,
         icon: String,
         subtitle: String,
-        maxSliderValue: Int = 50000,  // Default max, can be overridden for spending
-        themeOverride: AppTheme? = nil  // Optional: pass inverted theme for spending
+        maxSliderValue: Int? = nil,
+        themeOverride: AppTheme? = nil,
+        showCurrencyHint: Bool = false
     ) -> some View {
+        let currency = CurrencyManager.shared.selected
+        let resolvedMax = maxSliderValue ?? currency.sliderMax
+
         VStack(spacing: 24) {
             Spacer()
             
@@ -226,9 +229,10 @@ struct OnboardingView: View {
             OnboardingSlider(
                 question: question,
                 value: value,
-                maxValue: maxSliderValue,
-                step: 500,
-                themeOverride: themeOverride
+                maxValue: resolvedMax,
+                step: currency.sliderStep,
+                themeOverride: themeOverride,
+                showCurrencyHint: showCurrencyHint
             )
             
             Spacer()
@@ -251,7 +255,7 @@ struct OnboardingView: View {
     
     private var pageIndicators: some View {
         HStack(spacing: 8) {
-            ForEach(0..<4, id: \.self) { index in
+            ForEach(0..<3, id: \.self) { index in
                 Capsule()
                     .fill(index == currentPage ? themeColors.accent : themeColors.primary.opacity(0.2))
                     .frame(width: index == currentPage ? 24 : 8, height: 8)
@@ -270,7 +274,7 @@ struct OnboardingView: View {
 
     private var actionButton: some View {
         Button {
-            if currentPage < 3 {
+            if currentPage < 2 {
                 // Dismiss keyboard if on name page
                 if currentPage == 0 {
                     isNameFieldFocused = false
@@ -278,6 +282,8 @@ struct OnboardingView: View {
                 withAnimation(.easeInOut(duration: 0.4)) {
                     currentPage += 1
                 }
+                // Lock out backward navigation to completed pages
+                minPage = currentPage
                 // Haptic for page change
                 let generator = UIImpactFeedbackGenerator(style: .medium)
                 generator.impactOccurred()
@@ -287,10 +293,10 @@ struct OnboardingView: View {
         } label: {
             if #available(iOS 26.0, *) {
                 HStack(spacing: 8) {
-                    Text(currentPage < 3 ? "Continue" : "Get Started")
+                    Text(currentPage < 2 ? "Continue" : "Get Started")
                         .fontWeight(.semibold)
 
-                    Image(systemName: currentPage < 3 ? "arrow.right" : "checkmark")
+                    Image(systemName: currentPage < 2 ? "arrow.right" : "checkmark")
                         .font(.body.weight(.semibold))
                 }
                 .foregroundStyle(canProceed ? themeColors.primary : themeColors.primary.opacity(0.4))
@@ -345,23 +351,16 @@ struct OnboardingView: View {
         UserDefaults.standard.set(trimmedName, forKey: "userName")
         UserDefaults.standard.set(allowance, forKey: "userAllowance")
         UserDefaults.standard.set(spending, forKey: "userSpending")
-        UserDefaults.standard.set(currentBalance, forKey: "userBalance")
+        // Default starting balance = allowance (fresh month)
+        UserDefaults.standard.set(allowance, forKey: "userBalance")
         
         // Haptic for completion
         let generator = UINotificationFeedbackGenerator()
         generator.notificationOccurred(.success)
         
-        // Start Transition
-        // withAnimation(.easeInOut(duration: 0.5)) {
-        //     showTransition = true
-        // }
-        
-        // Delay before actually completing
-        // DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
             withAnimation(.easeOut(duration: 0.5)) {
                 isOnboardingComplete = true
             }
-        // }
     }
 }
 

@@ -16,11 +16,15 @@ struct OnboardingTickConfig {
 /// A premium tick-based slider with haptics, sound, Liquid Glass effects, and dynamic theming
 struct OnboardingSlider: View {
     let question: String
-    @Binding var value: Int  // Value in rupees (0, 500, 1000, etc.)
+    @Binding var value: Int
     let maxValue: Int
     let step: Int
-    var themeOverride: AppTheme? = nil  // Optional: use parent's theme instead of calculating
+    var themeOverride: AppTheme? = nil
+    var showCurrencyHint: Bool = false
     @Environment(\.colorScheme) var colorScheme
+
+    // Currency picker state
+    @State private var showCurrencyPicker = false
 
     // Configuration
     private let config = OnboardingTickConfig()
@@ -80,29 +84,42 @@ struct OnboardingSlider: View {
     
     // MARK: - Value Display
     private var valueDisplay: some View {
-        VStack(spacing: 4) {
-            Text("₹\(formattedValue)")
+        let cm = CurrencyManager.shared
+        return VStack(spacing: 4) {
+            Text("\(cm.symbol)\(formattedValue)")
                 .font(.system(size: 56, weight: .bold, design: .rounded))
                 .foregroundStyle(themeColors.primary)
                 .contentTransition(.numericText(value: Double(value)))
+
+            if showCurrencyHint {
+                HStack(spacing: 4) {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 11))
+                    Text("Long press to change currency")
+                        .font(.system(size: 12, weight: .medium, design: .rounded))
+                }
+                .foregroundStyle(themeColors.secondary.opacity(0.7))
+                .padding(.top, 4)
+            }
         }
         .padding(.horizontal, 32)
         .padding(.vertical, 20)
         .frame(maxWidth: .infinity)
         .glassEffect(.regular.tint(themeColors.accent.opacity(0.3)), in: .rect(cornerRadius: 24))
         .padding(.horizontal, 40)
-    }
-    
-    private var formattedValue: String {
-        if value >= 1000 {
-            let thousands = Double(value) / 1000.0
-            if thousands.truncatingRemainder(dividingBy: 1) == 0 {
-                return "\(Int(thousands))K"
-            } else {
-                return String(format: "%.1fK", thousands)
-            }
+        .onLongPressGesture(minimumDuration: 0.4) {
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.impactOccurred()
+            showCurrencyPicker = true
         }
-        return "\(value)"
+        .confirmationDialog("Select Currency", isPresented: $showCurrencyPicker, titleVisibility: .visible) {
+            ForEach(AppCurrency.allCases) { currency in
+                Button("\(currency.flag) \(currency.symbol) – \(currency.displayName)") {
+                    switchCurrency(to: currency)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        }
     }
     
     // MARK: - Tick Picker
@@ -234,14 +251,15 @@ struct OnboardingSlider: View {
     
     // MARK: - Range Labels
     private var rangeLabels: some View {
-        HStack {
-            Text("₹0")
+        let cm = CurrencyManager.shared
+        return HStack {
+            Text("\(cm.symbol)0")
                 .font(.caption)
                 .foregroundStyle(themeColors.secondary)
             
             Spacer()
             
-            Text("₹\(maxValue / 1000)K")
+            Text(cm.shortFormatted(maxValue))
                 .font(.caption)
                 .foregroundStyle(themeColors.secondary)
         }
@@ -257,12 +275,43 @@ struct OnboardingSlider: View {
     }
     
     private func triggerFeedback() {
-        // Haptic feedback - using selection change for slider feel
         feedbackGenerator.impactOccurred()
-        
-        // Sound feedback (system tick sound 1157)
         let systemSoundID: SystemSoundID = 1157
         AudioServicesPlaySystemSound(systemSoundID)
+    }
+
+    // MARK: - Formatted Value
+    private var formattedValue: String {
+        if value >= 1000 {
+            let thousands = Double(value) / 1000.0
+            if thousands.truncatingRemainder(dividingBy: 1) == 0 {
+                return "\(Int(thousands))K"
+            } else {
+                return String(format: "%.1fK", thousands)
+            }
+        }
+        return "\(value)"
+    }
+
+    // MARK: - Switch Currency
+    private func switchCurrency(to newCurrency: AppCurrency) {
+        let oldCurrency = CurrencyManager.shared.selected
+        guard oldCurrency != newCurrency else { return }
+
+        // Proportionally rescale the current value
+        let oldMax = Double(oldCurrency.sliderMax)
+        let newMax = Double(newCurrency.sliderMax)
+        let ratio = Double(value) / oldMax
+        let newRaw = ratio * newMax
+        // Snap to the nearest step
+        let snapped = Int((newRaw / Double(newCurrency.sliderStep)).rounded()) * newCurrency.sliderStep
+        let clamped = max(0, min(snapped, newCurrency.sliderMax))
+
+        CurrencyManager.shared.selected = newCurrency
+
+        withAnimation(.easeInOut(duration: 0.3)) {
+            value = clamped
+        }
     }
 }
 
