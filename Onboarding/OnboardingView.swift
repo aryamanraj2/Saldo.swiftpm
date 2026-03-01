@@ -122,16 +122,20 @@ struct OnboardingView: View {
     // MARK: - Name Input Slide
     private var nameInputSlide: some View {
         VStack(spacing: 32) {
-            Spacer()
+            // Only show spacer + icon when keyboard is NOT showing
+            if !isNameFieldFocused {
+                Spacer()
 
-            // Greeting icon with glass effect
-            if #available(iOS 26.0, *) {
-                Image(systemName: "hand.wave.fill")
-                    .font(.system(size: 44))
-                    .foregroundStyle(themeColors.accent)
-                    .frame(width: 80, height: 80)
-                    .glassEffect(.regular.tint(themeColors.accent.opacity(0.2)))
-                    .symbolEffect(.wiggle, options: .repeat(2))
+                // Greeting icon with glass effect
+                if #available(iOS 26.0, *) {
+                    Image(systemName: "hand.wave.fill")
+                        .font(.system(size: 44))
+                        .foregroundStyle(themeColors.accent)
+                        .frame(width: 80, height: 80)
+                        .glassEffect(.regular.tint(themeColors.accent.opacity(0.2)))
+                        .symbolEffect(.wiggle, options: .repeat(2))
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                }
             }
 
             // Question text
@@ -144,6 +148,7 @@ struct OnboardingView: View {
                     .font(.system(size: 34, weight: .bold, design: .rounded))
                     .foregroundStyle(themeColors.primary)
             }
+            .padding(.top, isNameFieldFocused ? 40 : 0)
 
             // Elegant text field with liquid glass
             if #available(iOS 26.0, *) {
@@ -179,14 +184,9 @@ struct OnboardingView: View {
                 .foregroundStyle(themeColors.secondary)
 
             Spacer()
-            Spacer()
         }
+        .animation(.easeInOut(duration: 0.3), value: isNameFieldFocused)
         .padding(.horizontal, 16)
-        .task {
-            // Auto-focus the text field with a slight delay for smooth transition
-            try? await Task.sleep(for: .seconds(0.5))
-            isNameFieldFocused = true
-        }
     }
 
     // MARK: - Slide Content
