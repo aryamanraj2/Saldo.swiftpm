@@ -19,7 +19,7 @@ enum TransactionType: String, CaseIterable, Identifiable {
 struct ManualPaymentSheet: View {
     @Environment(\.dismiss) private var dismiss
     var colors: ThemeColors
-    @Binding var balance: Double
+    var transactionStore: TransactionStore
 
     // Form State
     @State private var merchantName: String = ""
@@ -217,11 +217,33 @@ struct ManualPaymentSheet: View {
                     // Save Button
                     Button {
                         guard let value = Double(amount) else { return }
+
+                        // Convert to primary currency
+                        let primaryAmount = TransactionStore.convertToPrimary(
+                            amount: value,
+                            fromSymbol: selectedCurrency.symbol
+                        )
+
+                        // Create transaction record
+                        let record = TransactionRecord(
+                            title: merchantName.trimmingCharacters(in: .whitespacesAndNewlines),
+                            icon: selectedCategory.iconName,
+                            category: selectedCategory.rawValue,
+                            type: transactionType == .expense ? .expense : .income,
+                            amountInPrimary: primaryAmount,
+                            originalAmount: value,
+                            originalCurrency: selectedCurrency.code,
+                            source: .manual
+                        )
+
+                        transactionStore.add(record)
+
                         if transactionType == .expense {
-                            balance -= value
+                            transactionStore.adjustBalance(by: -primaryAmount)
                         } else {
-                            balance += value
+                            transactionStore.adjustBalance(by: primaryAmount)
                         }
+
                         dismiss()
                     } label: {
                         HStack(spacing: 8) {
@@ -428,6 +450,6 @@ private struct ManualPaymentSheetEnhancements: ViewModifier {
     Color.gray.opacity(0.3)
         .ignoresSafeArea()
         .sheet(isPresented: .constant(true)) {
-            ManualPaymentSheet(colors: AppTheme.moderate.colors, balance: .constant(4500))
+            ManualPaymentSheet(colors: AppTheme.moderate.colors, transactionStore: TransactionStore.shared)
         }
 }

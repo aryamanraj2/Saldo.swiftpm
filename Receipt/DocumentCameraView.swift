@@ -198,6 +198,7 @@ struct DocumentCameraView: UIViewControllerRepresentable {
 struct ScanResultSheet: View {
     let metadata: ReceiptMetadata
     var colors: ThemeColors
+    var transactionStore: TransactionStore
     var onDismiss: () -> Void
 
     // Editable state pre-populated from OCR
@@ -312,7 +313,39 @@ struct ScanResultSheet: View {
 
                     // MARK: - Action Buttons
                     VStack(spacing: 12) {
-                        Button(action: onDismiss) {
+                        Button(action: {
+                            // Parse amount (strip non-numeric chars except decimal)
+                            let cleanedAmount = amountString.replacingOccurrences(
+                                of: "[^0-9.]", with: "", options: .regularExpression
+                            )
+                            guard let value = Double(cleanedAmount), value > 0 else {
+                                onDismiss()
+                                return
+                            }
+
+                            // Detect currency from receipt OCR or default to primary
+                            let receiptCurrency = AppCurrency.allCases.first {
+                                $0.rawValue == (metadata.currencyCode ?? "")
+                            } ?? CurrencyManager.shared.selected
+
+                            let primaryAmount = receiptCurrency.convert(value, to: CurrencyManager.shared.selected)
+
+                            let record = TransactionRecord(
+                                title: merchantName.isEmpty ? "Receipt" : merchantName.trimmingCharacters(in: .whitespacesAndNewlines),
+                                icon: "doc.text.fill",
+                                category: "Receipt",
+                                type: .expense,
+                                amountInPrimary: primaryAmount,
+                                originalAmount: value,
+                                originalCurrency: receiptCurrency.rawValue,
+                                date: selectedDate,
+                                source: .receipt
+                            )
+
+                            transactionStore.add(record)
+                            transactionStore.adjustBalance(by: -primaryAmount)
+                            onDismiss()
+                        }) {
                             HStack(spacing: 8) {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.system(size: 18, weight: .semibold))
@@ -575,5 +608,5 @@ struct ProcessingOverlay: View {
 }
 
 #Preview {
-    ScanResultSheet(metadata: .sample, colors: AppTheme.wealthy.colors, onDismiss: {})
+    ScanResultSheet(metadata: .sample, colors: AppTheme.wealthy.colors, transactionStore: TransactionStore.shared, onDismiss: {})
 }

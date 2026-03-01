@@ -16,6 +16,7 @@ class OnboardingManager {
         static let userBalance = "userBalance"
         static let allowanceDay = "allowanceDay"
         static let grailAllocations = "grailAllocations"
+        static let lastResetDate = "lastResetDate"
     }
 
     // Properties for SwiftUI observation (no @Published needed with @Observable)
@@ -55,6 +56,16 @@ class OnboardingManager {
         }
     }
 
+    var lastResetDate: Date? {
+        didSet {
+            if let date = lastResetDate {
+                UserDefaults.standard.set(date.timeIntervalSince1970, forKey: Keys.lastResetDate)
+            } else {
+                UserDefaults.standard.removeObject(forKey: Keys.lastResetDate)
+            }
+        }
+    }
+
     var grailAllocations: [String: Int] {
         didSet {
             if let data = try? JSONEncoder().encode(grailAllocations) {
@@ -91,6 +102,9 @@ class OnboardingManager {
         let storedDay = UserDefaults.standard.integer(forKey: Keys.allowanceDay)
         self.allowanceDay = storedDay > 0 ? storedDay : 1
 
+        let resetTimestamp = UserDefaults.standard.double(forKey: Keys.lastResetDate)
+        self.lastResetDate = resetTimestamp > 0 ? Date(timeIntervalSince1970: resetTimestamp) : nil
+
         if let data = UserDefaults.standard.data(forKey: Keys.grailAllocations),
            let decoded = try? JSONDecoder().decode([String: Int].self, from: data) {
             self.grailAllocations = decoded
@@ -107,6 +121,7 @@ class OnboardingManager {
         userSpending = 0
         userBalance = 0
         allowanceDay = 1
+        lastResetDate = nil
         grailAllocations = [:]
     }
 }

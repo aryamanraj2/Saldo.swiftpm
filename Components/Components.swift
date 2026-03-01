@@ -191,7 +191,7 @@ struct CachedMonthData: Equatable {
     let streak: Int
     let loggedSet: Set<Int>
 
-    static func compute() -> CachedMonthData {
+    static func compute(loggedDays: Set<Int> = []) -> CachedMonthData {
         let cal = Calendar.current
         let now = Date()
         let today = cal.startOfDay(for: now)
@@ -203,13 +203,12 @@ struct CachedMonthData: Equatable {
         let todayD = cal.component(.day, from: today)
         let f = DateFormatter(); f.dateFormat = "MMMM"
 
-        // Mock: logged if day % 3 != 0 (replace with real data later)
-        var logged = Set<Int>()
-        for d in 1...todayD where d % 3 != 0 { logged.insert(d) }
+        // Use real logged days from TransactionStore
+        let logged = loggedDays
 
         var streak = 0
         for d in stride(from: todayD, through: 1, by: -1) {
-            if d % 3 != 0 { streak += 1 } else { break }
+            if logged.contains(d) { streak += 1 } else { break }
         }
 
         return CachedMonthData(
@@ -228,6 +227,7 @@ struct CachedMonthData: Equatable {
 // MARK: - Consistency Widget (Page 3 – GPU-Optimised)
 struct ConsistencyWidget: View {
     var colors: ThemeColors
+    var transactionStore: TransactionStore
     @Environment(\.colorScheme) var colorScheme
     @State private var data = CachedMonthData.compute()
 
@@ -272,7 +272,7 @@ struct ConsistencyWidget: View {
             .padding(.bottom, botPad)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear { data = CachedMonthData.compute() }
+        .onAppear { data = CachedMonthData.compute(loggedDays: transactionStore.loggedDaysThisMonth()) }
     }
 
     // MARK: Sub-views
@@ -392,6 +392,7 @@ struct ConsistencyWidget: View {
 struct SwipeableBalanceCard: View {
     var balance: Double
     var colors: ThemeColors
+    var transactionStore: TransactionStore
     var onTotalSavedTapped: (() -> Void)? = nil
 
     private let pageCount = 3
@@ -416,7 +417,7 @@ struct SwipeableBalanceCard: View {
                         .onTapGesture { onTotalSavedTapped?() }
 
                     // Page 3: Consistency Widget
-                    ConsistencyWidget(colors: colors)
+                    ConsistencyWidget(colors: colors, transactionStore: transactionStore)
                         .frame(width: pageWidth)
                 }
                 .offset(x: -CGFloat(selectedPage) * pageWidth + dragOffset)
@@ -541,41 +542,13 @@ enum SpendPeriod: String, CaseIterable {
     case day = "D"
     case week = "W"
     case month = "M"
-    
+
     var title: String {
         switch self {
         case .day: return "Spent today"
         case .week: return "Spent this week"
         case .month: return "Spent this month"
         }
-    }
-    
-    var amount: String {
-        let s = AppCurrency.currentSymbol
-        switch self {
-        case .day: return "\(s)450"
-        case .week: return "\(s)1,500"
-        case .month: return "\(s)6,200"
-        }
-    }
-    
-    var comparison: String {
-        switch self {
-        case .day: return "8% higher"
-        case .week: return "12% higher"
-        case .month: return "5% lower"
-        }
-    }
-    
-    var isHigher: Bool {
-        switch self {
-        case .day, .week: return true
-        case .month: return false
-        }
-    }
-    
-    var dataPoints: [SpendDataPoint] {
-        SpendDataPoint.sampleData(for: self)
     }
 }
 
@@ -790,9 +763,30 @@ struct GlassPeriodSelector: View {
 // MARK: - Weekly Spend Card
 struct WeeklySpendCard: View {
     var colors: ThemeColors
+    var transactionStore: TransactionStore
+    var subscriptions: [SubscriptionItem] = []
     @State private var selectedPeriod: SpendPeriod = .week
     @State private var animationProgress: CGFloat = 1.0
-    
+
+    private var periodAmount: Double {
+        let txAmount: Double
+        switch selectedPeriod {
+        case .day:   txAmount = transactionStore.expensesToday()
+        case .week:  txAmount = transactionStore.expensesThisWeek()
+        case .month: txAmount = transactionStore.expensesThisMonth()
+        }
+        let subAmount = transactionStore.subscriptionCostForPeriod(selectedPeriod, subscriptions: subscriptions)
+        return txAmount + subAmount
+    }
+
+    private var formattedAmount: String {
+        CurrencyManager.shared.formatted(periodAmount, fractionDigits: 0)
+    }
+
+    private var dataPoints: [SpendDataPoint] {
+        transactionStore.dataPointsForPeriod(selectedPeriod)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Smooth Liquid Glass Period Selector
@@ -807,32 +801,42 @@ struct WeeklySpendCard: View {
                     }
                 }
             )
-            
+
             Text(selectedPeriod.title)
                 .font(.subheadline)
                 .fontWeight(.medium)
                 .foregroundStyle(Color.saldoSecondary)
                 .animation(.none, value: selectedPeriod)
-            
-            Text(selectedPeriod.amount)
+
+            Text(formattedAmount)
                 .contentTransition(.numericText())
                 .font(.system(size: 32, weight: .bold, design: .rounded))
                 .foregroundStyle(colors.primary)
-            
-            HStack(spacing: 4) {
-                Image(systemName: selectedPeriod.isHigher ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
-                    .font(.caption)
-                    .foregroundStyle(selectedPeriod.isHigher ? Color.black.opacity(0.7) : Color.gray)
-                Text(selectedPeriod.comparison)
-                    .font(.caption)
+
+            if periodAmount > 0 {
+                HStack(spacing: 4) {
+                    Image(systemName: "chart.line.uptrend.xyaxis")
+                        .font(.caption)
+                    Text("Tracked spending")
+                        .font(.caption)
+                }
+                .foregroundStyle(Color.saldoSecondary)
+            } else {
+                HStack(spacing: 4) {
+                    Image(systemName: "minus.circle")
+                        .font(.caption)
+                        .foregroundStyle(Color.gray)
+                    Text("No spending yet")
+                        .font(.caption)
+                }
+                .foregroundStyle(Color.saldoSecondary)
             }
-            .foregroundStyle(Color.saldoSecondary)
-            
+
             Spacer()
-            
+
             // Smooth Curved Line Graph
             SpendLineGraph(
-                dataPoints: selectedPeriod.dataPoints,
+                dataPoints: dataPoints,
                 accentColor: colors.accent,
                 lineColor: colors.primary,
                 animationProgress: animationProgress

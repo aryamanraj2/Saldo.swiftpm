@@ -2,11 +2,16 @@ import SwiftUI
 import VisionKit
 
 struct HomeView: View {
-    @State private var balance: Double = 4500.0
+    @State private var transactionStore = TransactionStore.shared
     @Environment(\.colorScheme) var colorScheme
 
     // User name from onboarding
     @AppStorage("userName") private var userName: String = ""
+
+    // Live balance from OnboardingManager (persisted)
+    private var balance: Double {
+        Double(OnboardingManager.shared.userBalance)
+    }
 
     // Camera and scanning state - owned by HomeView to avoid nested sheet issues
     @State private var showCamera = false
@@ -78,14 +83,14 @@ struct HomeView: View {
                         .padding(.top, 60) // Add padding to avoid collision
                         
                         // Main Balance (Swipeable: Remaining Balance ↔ Total Saved)
-                        SwipeableBalanceCard(balance: balance, colors: colors)
+                        SwipeableBalanceCard(balance: balance, colors: colors, transactionStore: transactionStore)
                             .padding(.horizontal, 20)
                             .tutorialHighlight(.remainingBalance)
                         
                         // Grid Section
                         HStack(alignment: .top, spacing: 12) {
                             // Left Column: Weekly Spend
-                            WeeklySpendCard(colors: colors)
+                            WeeklySpendCard(colors: colors, transactionStore: transactionStore, subscriptions: subscriptions)
                             
                             // Right Column: Actions
                             VStack(spacing: 12) {
@@ -132,7 +137,7 @@ struct HomeView: View {
                         
                         // Transactions Section
                         VStack(alignment: .leading, spacing: 12) {
-                            NavigationLink(destination: AllTransactionsView(colors: colors)) {
+                            NavigationLink(destination: AllTransactionsView(colors: colors, transactionStore: transactionStore)) {
                                 HStack(alignment: .center) {
                                     Text("Recent Transactions")
                                         .font(.title3)
@@ -149,29 +154,32 @@ struct HomeView: View {
                             .buttonStyle(.plain)
                             .padding(.horizontal, 20)
                             
-                            VStack(spacing: 8) {
-                                TransactionRow(icon: "basket.fill", title: "Grocery", subtitle: "5:30 PM", amount: "\(CurrencyManager.shared.symbol)450.00", colors: colors)
-                                TransactionRow(icon: "music.note", title: "Spotify", subtitle: "Yesterday", amount: "\(CurrencyManager.shared.symbol)119.00", colors: colors)
-                                TransactionRow(icon: "cup.and.saucer.fill", title: "Starbucks", subtitle: "Yesterday", amount: "\(CurrencyManager.shared.symbol)350.00", colors: colors)
+                            let recentTxs = transactionStore.recentTransactions(limit: 3)
+                            if recentTxs.isEmpty {
+                                Text("No transactions yet")
+                                    .font(.subheadline)
+                                    .foregroundStyle(Color.saldoSecondary)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 20)
+                            } else {
+                                VStack(spacing: 8) {
+                                    ForEach(recentTxs) { tx in
+                                        TransactionRow(
+                                            icon: tx.icon,
+                                            title: tx.title,
+                                            subtitle: tx.subtitle,
+                                            amount: tx.formattedAmount,
+                                            colors: colors
+                                        )
+                                    }
+                                }
+                                .padding(.horizontal, 20)
                             }
-                            .padding(.horizontal, 20)
                         }
                         .padding(.bottom, 10)
-                        
-                        // DEBUG CONTROLS
-                        VStack(spacing: 10) {
-                            Text("Debug Balance: \(CurrencyManager.shared.symbol)\(Int(balance))")
-                                .font(.caption)
-                                .foregroundStyle(Color.secondary)
-                            
-                            Slider(value: $balance, in: 0...10000)
-                                .tint(colors.accent)
-                        }
-                        .padding(20)
-                        .background(.ultraThinMaterial)
-                        .clipShape(.rect(cornerRadius: 15))
-                        .padding(.horizontal, 20)
-                        .padding(.bottom, 100) // Fixed padding for native sheet
+
+                        Spacer()
+                            .frame(height: 100) // Padding for native sheet
                     }
                 }
                 // Auto-collapse sheet on scroll
@@ -310,7 +318,7 @@ struct HomeView: View {
             }
         }) {
             if let result = scanResult {
-                ScanResultSheet(metadata: result, colors: colors) {
+                ScanResultSheet(metadata: result, colors: colors, transactionStore: transactionStore) {
                     showResultSheet = false
                     scanResult = nil
                 }
@@ -401,7 +409,7 @@ struct HomeView: View {
                 }
             }
         }) {
-            ManualPaymentSheet(colors: colors, balance: $balance)
+            ManualPaymentSheet(colors: colors, transactionStore: transactionStore)
         }
         // Profile Sheet
         .sheet(isPresented: $showProfileSheet, onDismiss: {
@@ -424,6 +432,8 @@ struct HomeView: View {
             hasLoadedGrails = true
             subscriptions = SubscriptionStore.load()
             await grailStore.load()
+            transactionStore.load()
+            transactionStore.checkAllowanceReset(grailStore: grailStore)
         }
         .onChange(of: subscriptions) {
             SubscriptionStore.save(subscriptions)

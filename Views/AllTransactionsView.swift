@@ -1,42 +1,11 @@
 import SwiftUI
 
-struct TransactionItem: Identifiable {
-    let id = UUID()
-    let icon: String
-    let title: String
-    let date: Date
-    let amount: Double
-    let type: TransactionType
-    
-    enum TransactionType {
-        case expense, income
-    }
-    
-    var subtitle: String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .full
-        return formatter.localizedString(for: date, relativeTo: Date())
-    }
-    
-    var formattedAmount: String {
-        let prefix = type == .income ? "+" : ""
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencySymbol = AppCurrency.currentSymbol
-        formatter.maximumFractionDigits = 2
-        formatter.minimumFractionDigits = 2
-        
-        let formattedString = formatter.string(from: NSNumber(value: amount)) ?? "\(AppCurrency.currentSymbol)\(amount)"
-        return "\(prefix)\(formattedString)"
-    }
-}
-
 enum SortOption: String, CaseIterable, Identifiable {
     case dateNewest = "Date (Newest)"
     case dateOldest = "Date (Oldest)"
     case amountHighest = "Amount (Highest)"
     case amountLowest = "Amount (Lowest)"
-    
+
     var id: String { rawValue }
 }
 
@@ -44,48 +13,36 @@ enum FilterOption: String, CaseIterable, Identifiable {
     case all = "All"
     case expenses = "Expenses"
     case income = "Income"
-    
+
     var id: String { rawValue }
 }
 
 struct AllTransactionsView: View {
     var colors: ThemeColors
+    var transactionStore: TransactionStore
     @Environment(\.colorScheme) private var colorScheme
     @State private var searchText = ""
     @State private var selectedFilter: FilterOption = .all
     @State private var selectedSort: SortOption = .dateNewest
-    
-    // Mock data based on the original HomeView with actual Date objects
-    @State private var transactions: [TransactionItem] = [
-        TransactionItem(icon: "basket.fill", title: "Grocery", date: Calendar.current.date(byAdding: .hour, value: -2, to: Date())!, amount: 450.00, type: .expense),
-        TransactionItem(icon: "music.note", title: "Spotify", date: Calendar.current.date(byAdding: .day, value: -1, to: Date())!, amount: 119.00, type: .expense),
-        TransactionItem(icon: "cup.and.saucer.fill", title: "Starbucks", date: Calendar.current.date(byAdding: .day, value: -1, to: Date())!, amount: 350.00, type: .expense),
-        TransactionItem(icon: "gamecontroller.fill", title: "Steam", date: Calendar.current.date(byAdding: .day, value: -2, to: Date())!, amount: 899.00, type: .expense),
-        TransactionItem(icon: "briefcase.fill", title: "Salary", date: Calendar.current.date(byAdding: .day, value: -5, to: Date())!, amount: 125000.00, type: .income),
-        TransactionItem(icon: "car.fill", title: "Uber", date: Calendar.current.date(byAdding: .day, value: -7, to: Date())!, amount: 250.00, type: .expense),
-        TransactionItem(icon: "film.fill", title: "Netflix", date: Calendar.current.date(byAdding: .day, value: -7, to: Date())!, amount: 199.00, type: .expense),
-        TransactionItem(icon: "fork.knife", title: "Dinner", date: Calendar.current.date(byAdding: .day, value: -14, to: Date())!, amount: 1200.00, type: .expense),
-        TransactionItem(icon: "dollarsign.arrow.circlepath", title: "Refund", date: Calendar.current.date(byAdding: .day, value: -14, to: Date())!, amount: 450.00, type: .income)
-    ]
-    
-    var filteredAndSortedTransactions: [TransactionItem] {
-        var result = transactions
-        
+
+    var filteredAndSortedTransactions: [TransactionRecord] {
+        var result = transactionStore.transactions
+
         // 1. Filter
         switch selectedFilter {
         case .all: break
         case .expenses: result = result.filter { $0.type == .expense }
         case .income: result = result.filter { $0.type == .income }
         }
-        
+
         // 2. Search
         if !searchText.isEmpty {
-            result = result.filter { 
+            result = result.filter {
                 $0.title.localizedStandardContains(searchText) ||
                 $0.subtitle.localizedStandardContains(searchText)
             }
         }
-        
+
         // 3. Sort
         switch selectedSort {
         case .dateNewest:
@@ -93,23 +50,23 @@ struct AllTransactionsView: View {
         case .dateOldest:
             result.sort { $0.date < $1.date }
         case .amountHighest:
-            result.sort { $0.amount > $1.amount }
+            result.sort { $0.amountInPrimary > $1.amountInPrimary }
         case .amountLowest:
-            result.sort { $0.amount < $1.amount }
+            result.sort { $0.amountInPrimary < $1.amountInPrimary }
         }
-        
+
         return result
     }
-    
+
     var isFilteredOrSorted: Bool {
         selectedFilter != .all || selectedSort != .dateNewest
     }
-    
+
     var body: some View {
         ZStack {
             CleanBackground(colors: colors)
                 .ignoresSafeArea()
-            
+
             ScrollView {
                 VStack(spacing: 12) {
                     // Header Area
@@ -129,18 +86,18 @@ struct AllTransactionsView: View {
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, 110)
-                    
+
                     // Floating Liquid Glass Search Bar
                     HStack {
                         Image(systemName: "magnifyingglass")
                             .font(.system(size: 18, weight: .medium))
                             .foregroundStyle(colors.primary.opacity(0.7))
-                        
+
                         TextField("Search transactions", text: $searchText)
                             .font(.body)
                             .foregroundStyle(colors.primary)
                             .submitLabel(.search)
-                        
+
                         if !searchText.isEmpty {
                             Button {
                                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
@@ -177,14 +134,14 @@ struct AllTransactionsView: View {
 
                     if filteredAndSortedTransactions.isEmpty {
                         VStack(spacing: 12) {
-                            Image(systemName: "magnifyingglass")
+                            Image(systemName: transactionStore.transactions.isEmpty ? "tray" : "magnifyingglass")
                                 .font(.system(size: 40))
                                 .foregroundStyle(Color.saldoSecondary)
                                 .padding(.top, 40)
-                            Text("No transactions found")
+                            Text(transactionStore.transactions.isEmpty ? "No transactions yet" : "No transactions found")
                                 .font(.headline)
                                 .foregroundStyle(colors.primary)
-                            Text("Try a different search or filter.")
+                            Text(transactionStore.transactions.isEmpty ? "Your transactions will appear here." : "Try a different search or filter.")
                                 .font(.subheadline)
                                 .foregroundStyle(Color.saldoSecondary)
                         }
@@ -223,7 +180,7 @@ struct AllTransactionsView: View {
         .navigationTitle("Transactions")
         .navigationBarTitleDisplayMode(.inline)
     }
-    
+
     private var sortFilterMenu: some View {
         Menu {
             Section("Sort By") {
@@ -233,7 +190,7 @@ struct AllTransactionsView: View {
                     }
                 }
             }
-            
+
             Section("Filter By Type") {
                 Picker("Filter By Type", selection: $selectedFilter) {
                     ForEach(FilterOption.allCases) { option in
