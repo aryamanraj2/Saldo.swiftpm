@@ -116,6 +116,11 @@ final class TransactionStore {
         save()
     }
 
+    func clearAll() {
+        transactions = []
+        try? FileManager.default.removeItem(at: Self.fileURL)
+    }
+
     private func save() {
         do {
             let data = try Self.encoder.encode(transactions)

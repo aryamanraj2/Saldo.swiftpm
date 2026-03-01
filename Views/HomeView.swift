@@ -419,7 +419,13 @@ struct HomeView: View {
                 }
             }
         }) {
-            ProfileSheet(colors: colors, grailPreviews: grailStore.cachedPreviewItems)
+            ProfileSheet(
+                colors: colors,
+                grailPreviews: grailStore.cachedPreviewItems,
+                grailStore: grailStore,
+                transactionStore: transactionStore,
+                subscriptions: $subscriptions
+            )
         }
         // Processing Overlay
         .overlay {

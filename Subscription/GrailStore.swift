@@ -103,6 +103,16 @@ final class GrailStore {
         }
     }
 
+    func removeAll() async {
+        grails = []
+        cachedPreviewItems = []
+        let metadataURL = metadataFileURL()
+        let imagesURL = imagesDirectoryURL()
+        try? FileManager.default.removeItem(at: metadataURL)
+        try? FileManager.default.removeItem(at: imagesURL)
+        try? FileManager.default.createDirectory(at: imagesURL, withIntermediateDirectories: true)
+    }
+
     func updateImage(for grailID: UUID, maskedImage: UIImage) async {
         let metadataURL = metadataFileURL()
         let imagesURL = imagesDirectoryURL()

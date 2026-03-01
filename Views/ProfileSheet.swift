@@ -6,12 +6,18 @@ struct ProfileSheet: View {
     @Environment(\.dismiss) private var dismiss
     var colors: ThemeColors
     var grailPreviews: [GrailPreviewItem]
+    var grailStore: GrailStore
+    var transactionStore: TransactionStore
+    @Binding var subscriptions: [SubscriptionItem]
 
     // Form State
     @State private var name: String = ""
     @State private var allowance: String = ""
     @State private var selectedDay: Int = 1
     @State private var allocations: [String: Double] = [:]
+
+    @State private var demoState: DemoRunState = .idle
+    @State private var demoSnapshot: DemoDataGenerator.Snapshot?
 
     @FocusState private var isNameFocused: Bool
     @FocusState private var isAmountFocused: Bool
@@ -60,6 +66,7 @@ struct ProfileSheet: View {
                     allowanceSection
                     daySection
                     allocationSection
+                    demoSection
                     saveButton
                 }
                 .padding(.top, 4)
@@ -184,6 +191,126 @@ struct ProfileSheet: View {
                 }
             }
         }
+    }
+
+    // MARK: - Demo Mode Section
+
+    private enum DemoRunState: Equatable {
+        case idle, running, done
+    }
+
+    private var demoSection: some View {
+        ProfileSectionCard(colors: colors) {
+            VStack(spacing: 16) {
+                // Header
+                HStack(spacing: 10) {
+                    ZStack {
+                        Circle()
+                            .fill(
+                                LinearGradient(
+                                    colors: [colors.accent, colors.accent.opacity(0.6)],
+                                    startPoint: .topLeading, endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 36, height: 36)
+                        Image(systemName: "wand.and.stars")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.white)
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("SSC Demo")
+                            .font(.subheadline).fontWeight(.bold)
+                            .foregroundStyle(Color.saldoPrimary)
+                        Text("Simulates a full month in one tap")
+                            .font(.caption2)
+                            .foregroundStyle(Color.saldoSecondary)
+                    }
+                    Spacer()
+                }
+
+                // Run / Reset button
+                if demoState == .done {
+                    Button {
+                        guard let snap = demoSnapshot else { return }
+                        demoState = .idle
+                        demoSnapshot = nil
+                        Task {
+                            await DemoDataGenerator.resetDemo(
+                                snapshot: snap,
+                                transactionStore: transactionStore,
+                                grailStore: grailStore
+                            )
+                            subscriptions = snap.subscriptions
+                        }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "arrow.counterclockwise")
+                                .font(.system(size: 14, weight: .bold))
+                            Text("Reset Demo")
+                                .font(.subheadline).fontWeight(.bold)
+                        }
+                        .foregroundStyle(.red.opacity(0.8))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .fill(Color.red.opacity(0.08))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                        .strokeBorder(Color.red.opacity(0.15), lineWidth: 1)
+                                )
+                        )
+                    }
+                } else {
+                    Button {
+                        guard demoState == .idle else { return }
+                        demoSnapshot = DemoDataGenerator.captureSnapshot(
+                            subscriptions: subscriptions,
+                            grailStore: grailStore
+                        )
+                        demoState = .running
+                        Task {
+                            let subs = await DemoDataGenerator.runDemo(
+                                transactionStore: transactionStore,
+                                grailStore: grailStore
+                            )
+                            subscriptions = subs
+                            demoState = .done
+                        }
+                    } label: {
+                        HStack(spacing: 10) {
+                            if demoState == .running {
+                                ProgressView()
+                                    .tint(.white)
+                                    .scaleEffect(0.85)
+                                Text("Simulating...")
+                                    .font(.subheadline).fontWeight(.bold)
+                            } else {
+                                Image(systemName: "play.fill")
+                                    .font(.system(size: 13, weight: .bold))
+                                Text("Run Full Demo")
+                                    .font(.subheadline).fontWeight(.bold)
+                            }
+                        }
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [colors.accent, colors.accent.opacity(0.75)],
+                                        startPoint: .leading, endPoint: .trailing
+                                    )
+                                )
+                                .shadow(color: colors.accent.opacity(0.35), radius: 8, y: 4)
+                        )
+                    }
+                    .disabled(demoState == .running)
+                }
+            }
+        }
+        .animation(.spring(response: 0.35), value: demoState)
     }
 
     // MARK: - Save Button
@@ -634,6 +761,12 @@ private struct ProfileSheetEnhancements: ViewModifier {
 #Preview {
     Color.gray.opacity(0.3).ignoresSafeArea()
         .sheet(isPresented: .constant(true)) {
-            ProfileSheet(colors: AppTheme.moderate.colors, grailPreviews: [])
+            ProfileSheet(
+                colors: AppTheme.moderate.colors,
+                grailPreviews: [],
+                grailStore: GrailStore(),
+                transactionStore: TransactionStore.shared,
+                subscriptions: .constant([])
+            )
         }
 }

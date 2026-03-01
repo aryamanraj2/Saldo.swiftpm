@@ -273,6 +273,9 @@ struct ConsistencyWidget: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear { data = CachedMonthData.compute(loggedDays: transactionStore.loggedDaysThisMonth()) }
+        .onChange(of: transactionStore.transactions.count) {
+            data = CachedMonthData.compute(loggedDays: transactionStore.loggedDaysThisMonth())
+        }
     }
 
     // MARK: Sub-views
@@ -335,9 +338,9 @@ struct ConsistencyWidget: View {
     @ViewBuilder
     private func cellView(dayNum: Int, cellW: CGFloat, cellH: CGFloat) -> some View {
         let valid   = dayNum >= 1 && dayNum <= data.daysInMonth
-        let future  = valid && dayNum > data.todayDay
+        let future  = valid && dayNum > data.todayDay && !data.loggedSet.contains(dayNum)
         let today   = valid && dayNum == data.todayDay
-        let logged  = valid && !future && data.loggedSet.contains(dayNum)
+        let logged  = valid && data.loggedSet.contains(dayNum)
         let r       = min(cellW, cellH) * 0.3
         let isDark  = colorScheme == .dark
 
