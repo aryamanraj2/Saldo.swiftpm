@@ -22,8 +22,8 @@
 <div align="center">
 <table>
   <tr>
-    <td align="center"><img src="Screenshots/home_green.png" width="180" alt="Dashboard — Healthy Balance"/><br/><sub>Dashboard · Healthy Balance</sub></td>
-    <td align="center"><img src="Screenshots/home_red.png" width="180" alt="Dashboard — Alert State"/><br/><sub>Dashboard · Alert State</sub></td>
+    <td align="center"><img src="Screenshots/home_green.png" width="180" alt="Dashboard — Healthy Balance"/><br/><sub>Dashboard · Alert State</sub></td>
+    <td align="center"><img src="Screenshots/home_red.png" width="180" alt="Dashboard — Alert State"/><br/><sub>Dashboard · payement</sub></td>
     <td align="center"><img src="Screenshots/transactions.png" width="180" alt="Transaction History"/><br/><sub>Transaction History</sub></td>
     <td align="center"><img src="Screenshots/add_payment.png" width="180" alt="Onboarding — Tutorial Overlay"/><br/><sub>Onboarding · Tutorial Overlay</sub></td>
     <td align="center"><img src="Screenshots/onboarding.png" width="180" alt="Onboarding — Spending Setup"/><br/><sub>Onboarding · Spending Setup</sub></td>
