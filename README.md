@@ -1,68 +1,122 @@
-<p align="center">
-  <img src="Assets.xcassets/AppIcon.appiconset/saldo.png" width="180" alt="Saldo App Icon">
-</p>
+<div align="center">
 
-<h1 align="center">Saldo</h1>
-<p align="center">
-  <strong>Selected Outstanding Submission • Apple Swift Student Challenge 2026 Winner</strong>
-</p>
+<img src="Assets.xcassets/AppIcon.appiconset/saldo.png" width="120" alt="Saldo App Icon">
 
-<p align="center">
-  <em>Bridging the gap to financial independence for college students.</em>
-</p>
+# Saldo
+
+**Personal Finance for the Allowance Generation**
+
+[![Platform](https://img.shields.io/badge/Platform-iOS%2026%2B-000000?style=flat-square&logo=apple&logoColor=white)](https://developer.apple.com)
+[![Swift](https://img.shields.io/badge/Swift-6.0-F05138?style=flat-square&logo=swift&logoColor=white)](https://swift.org)
+[![SwiftUI](https://img.shields.io/badge/SwiftUI-5.0-0076FF?style=flat-square&logo=swift&logoColor=white)](https://developer.apple.com/xcode/swiftui/)
+[![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
+
+---
+
+### Apple Swift Student Challenge 2026
+**Selected Outstanding Submission — One of the Best Projects**
+
+</div>
 
 ---
 
-## The Vision
+## The Story Behind Saldo
 
-The transition from student life to financial autonomy is a critical phase often overlooked by formal education. Saldo was developed to empower college students navigating the challenges of living from allowance to allowance. By providing a clear, intuitive, and secure platform, Saldo helps bridge the gap toward total financial independence through transparency and actionable insights.
+Every college student knows the feeling — the allowance arrives, and somehow, before the month is over, it is gone. Nobody teaches you where it went, and nobody teaches you how to stop it from happening again.
 
-## Key Features
+That gap is exactly why Saldo exists.
 
-Saldo is built entirely with native Apple frameworks, ensuring a premium, high-performance experience with zero external dependencies.
-
-### 1. Visual Savings (Grails)
-Users can track up to three primary savings objectives, known as "Grails." Saldo utilizes the **Vision framework** to automatically extract foreground subjects from user-uploaded images, creating elegant, masked previews that keep motivations visible.
-
-### 2. Intelligent Receipt Recognition
-Managing expenses is simplified through native **OCR (Optical Character Recognition)**. Using the iOS 26 `RecognizeDocumentsRequest`, Saldo scans physical receipts to extract transaction metadata, employing advanced filtering to distinguish amounts from promotional text.
-
-### 3. Dynamic Balance-Driven Theming
-The user interface adapts in real-time to the user's financial health. The app smoothly transitions its theme based on current balance and allowance cycles, providing immediate visual feedback on spending status:
-- **Red**: Low balance/critical spending.
-- **Yellow**: Moderate/cautious spending.
-- **Green**: Healthy/stable balance.
-
-### 4. Subscription & Recurring Expense Management
-Saldo provides a consolidated dashboard for tracking all recurring commitments, including streaming services, AI tools, and educational platforms, ensuring users are never surprised by scheduled payments.
-
-### 5. Liquid Glass Interaction Design
-Built with modern **SwiftUI** principles, Saldo features a custom "Liquid Glass" design system. This includes high-fidelity glassmorphism, fluid gesture-driven navigation via multi-detent bottom sheets, and custom scroll-synchronized animations.
-
-## Screenshots
-
-| Dashboard | Receipt Scanning | Savings Grails |
-| :---: | :---: | :---: |
-| ![Dashboard Placeholder](Assets.xcassets/AppIcon.appiconset/saldo.png) | ![Scanner Placeholder](Assets.xcassets/AppIcon.appiconset/saldo.png) | ![Grails Placeholder](Assets.xcassets/AppIcon.appiconset/saldo.png) |
-| *Adaptive balance dashboard* | *Vision-powered OCR scanning* | *Masked visual savings goals* |
-
-*(Note: Screenshots are representative of the iOS 26 user interface.)*
-
-## Technical Implementation
-
-- **Platform**: iOS 26.0+ (Swift Playground App Package)
-- **Architecture**: Domain-driven design with actor-isolated processing services for Vision and OCR tasks.
-- **State Management**: Reactive data flow using Swift 6 `@Observable` and `@AppStorage`.
-- **Concurrency**: Full optimization for Swift 6 strict concurrency, ensuring thread safety and responsive performance.
-- **Privacy**: All processing is performed strictly on-device. Financial data and assets never leave the user's hardware.
-- **Persistence**: Secure file-based persistence in the Application Support directory for image assets and metadata.
-
-## Installation
-
-To build and run the Saldo project:
-1. Open the `.swiftpm` package in **Xcode** or **Swift Playgrounds**.
-2. Select an iOS device or simulator running **iOS 26.0 or later**.
-3. *Recommendation: Use a physical device for features requiring the camera or Vision foreground masking.*
+Built for students who are one step away from financial independence, Saldo is not just a budgeting app. It is a shift in mindset — from reactive to intentional, from confused to in control. The name *Saldo* means **balance** in several languages, and that is precisely what it gives you.
 
 ---
-Designed and developed by Aryaman Jaiswal. Bridging the gap for the next generation.
+
+## What Saldo Does
+
+### Track Your Balance in Real Time
+
+The home dashboard is the one screen you need. It shows your remaining balance, your weekly spending trend, and your savings goals — all updated the moment you make a change.
+
+The interface itself reacts to your financial health. The theme shifts from red to yellow to green as your balance improves, giving you instant, visual feedback on where you stand.
+
+### Scan Receipts Without Thinking About It
+
+Point your camera at any receipt and Saldo handles the rest. Using native iOS 26 document recognition, it extracts the total amount, stores the transaction, and adjusts your balance automatically. No typing. No friction.
+
+### Set Savings Goals That Actually Feel Real
+
+Saldo introduces **Grails** — a visual way to track what you are saving toward. Add a photo of the thing you want, and the app uses Apple's Vision framework to isolate the subject and display it beautifully. Up to three active goals at a time, kept front and center to stay on your mind.
+
+### Know Your Subscriptions Before They Know You
+
+Streaming. Music. AI tools. Educational platforms. They add up quietly. Saldo keeps a clear running list of every recurring commitment so nothing catches you off guard at the end of the month.
+
+### Get Insights That Mean Something
+
+The Insights screen breaks down your spending patterns and surfaces the changes that would actually move the needle. It uses on-device AI — no data ever leaves your phone.
+
+---
+
+## Built Entirely with Apple Frameworks
+
+Saldo has no third-party dependencies. Every feature is implemented using the iOS SDK directly.
+
+| Framework | Used For |
+|---|---|
+| **SwiftUI** | All views, animations, and navigation |
+| **Vision** | Foreground masking for Grail images, OCR for receipts |
+| **VisionKit** | Document camera integration |
+| **Foundation Models** | On-device financial insights |
+| **Core Graphics** | Contour rendering and image optimization |
+
+---
+
+## Technical Highlights
+
+**Swift 6 Strict Concurrency** — The entire app is built with Swift 6's concurrency model. Image processing, OCR, and AI inference all run in actor-isolated contexts, keeping the UI thread free and the app feeling instant.
+
+**Zero Cloud Dependency** — Every piece of data — transactions, Grail images, subscriptions — lives in the app's local storage. There is no backend, no sync service, and no account required. Your financial data stays on your device.
+
+**Adaptive Theming Engine** — A custom `ThemeManager` maps your balance to a curated color palette and propagates it across the entire UI using a reactive `@Observable` architecture. The transition between states is animated.
+
+**Versioned Image Pipeline** — Grail images go through a multi-stage processing pipeline: Vision masking → resolution optimization (1024px) → disk persistence → downsampled preview (320px) → contour cache warm-up. The pipeline is versioned with automatic migration for future format changes.
+
+**Apple Maps-Style Bottom Sheet** — The main action panel uses a custom multi-detent sheet that collapses on scroll and coordinates presentation with every other modal in the app to prevent simultaneous sheet conflicts.
+
+---
+
+## Getting Started
+
+Open the project directly in **Swift Playgrounds** or **Xcode**:
+
+```
+1. Open Saldo.swiftpm
+2. Select an iOS 26.0+ device or simulator
+3. Build and run
+```
+
+> Features requiring the device camera or Vision framework work best on physical hardware.
+
+---
+
+## Project Structure
+
+```
+Saldo.swiftpm
+├── Views/          — Home, Transactions, Insights, Profile
+├── Components/     — BalanceCard, WeeklySpendGraph, TransactionRow, GrailContourRenderer
+├── Receipt/        — Document camera integration and OCR processing
+├── Subscription/   — Recurring payment models and persistence
+├── Onboarding/     — First-launch setup flow
+├── Theme/          — Balance-driven adaptive theming system
+└── Docs/           — Architecture documentation and design patterns
+```
+
+---
+
+<div align="center">
+
+Designed and built by **Aryaman Jaiswal**
+
+*For students who are ready to take control.*
+
+</div>
