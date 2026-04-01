@@ -13,8 +13,7 @@
 
 ---
 
-### Apple Swift Student Challenge 2026
-**Selected Outstanding Submission — One of the Best Projects**
+🏆 **Winner — Apple Swift Student Challenge 2026**
 
 </div>
 
